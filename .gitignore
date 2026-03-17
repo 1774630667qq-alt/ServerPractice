@@ -4,6 +4,7 @@
 # Executables
 EchoSever
 SocketTest
+include/
 
 # Build output directory
 build/
