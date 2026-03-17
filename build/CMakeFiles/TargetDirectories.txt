@@ -1,0 +1,4 @@
+/home/bazinga/ServerPractice/build/CMakeFiles/main.dir
+/home/bazinga/ServerPractice/build/CMakeFiles/EchoSever.dir
+/home/bazinga/ServerPractice/build/CMakeFiles/edit_cache.dir
+/home/bazinga/ServerPractice/build/CMakeFiles/rebuild_cache.dir

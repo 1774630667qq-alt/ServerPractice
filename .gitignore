@@ -1,0 +1,9 @@
+# Compiled object files
+*.o
+
+# Executables
+EchoSever
+SocketTest
+
+# IDE-specific folders (optional, but good practice)
+.vscode/
