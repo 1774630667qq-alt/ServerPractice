@@ -23,6 +23,21 @@ int main () {
     }
     std::cout << "Socket 创建成功，fd: " << listen_fd << std::endl;
 
+    // setsockopt()
+    /**
+     * @brief 设置套接字选项，控制套接字行为
+     * @signature int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
+     * @param sockfd 要设置选项的套接字文件描述符
+     * @param level 选项所在的协议层，例如 SOL_SOCKET 表示套接字层
+     * @param optname 要设置的选项名称，例如 SO_REUSEADDR 表示允许重用本地地址
+     * @param optval 指向包含选项值的缓冲区的指针，例如 int reuse = 1; &reuse
+     * @param optlen optval 缓冲区的大小，通常为 sizeof(optval)
+     * @return 成功返回 0，失败返回 -1
+     */
+    // 开启端口复用，允许服务器重启后立即绑定同一个端口、避免 "Address already in use" 错误、以及允许多个服务器实例绑定同一个端口（如负载均衡场景）
+    int opt = 1;
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
     // bind()
     /**
      * @brief 将一个名字(IP与端口)与套接字绑定到一起

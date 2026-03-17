@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 16:27:59
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-17 17:06:07
+ * @LastEditTime: 2026-03-17 22:31:56
  * @FilePath: /ServerPractice/EchoSever.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -17,6 +17,7 @@
 #include <iostream>
 #include <cstring>      // 提供 memset
 #include <thread>       // 提供 std::thread
+#include "ThreadPool.hpp" // 提供线程池类定义
 
 int main () {
     // 创建监听套接字
@@ -33,6 +34,10 @@ int main () {
     server_addr.sin_port = htons(8080);           // 端口号
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY); // 监听所有网卡
 
+    // 开启端口复用
+    int opt = 1;
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
     if (bind(listen_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
         std::cerr << "Bind 失败!" << std::endl;
         return -1;
@@ -44,6 +49,8 @@ int main () {
         return -1;
     }
     std::cout << "服务器启动，正在监听 8080 端口..." << std::endl;
+    // 创建线程池，假设我们创建一个包含 2 个工作线程的线程池
+    MyServer::ThreadPool pool(2);
 
     // 创建客户端地址结构
     struct sockaddr_in client_addr;
@@ -55,27 +62,23 @@ int main () {
             std::cerr << "Accept 失败!" << std::endl;
             continue; // 等待下一个连接
         }
-        std::cout << "有新客户端连上来了！分配的通信 fd: " << client_fd << std::endl;
         // 创建线程处理客户端通信
-        std::thread([client_fd]() {
+        auto task = [client_fd] () {
+            std::cout << "有新客户端连上来了！分配的通信 fd: " << client_fd << std::endl;
             char buffer[1024];
             while (true) {
-                memset(buffer, 0, sizeof(buffer)); // 清空缓冲区
-                ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-                if (bytes_read > 0) {
-                    std::cout << "收到通信 fd为 " << client_fd << " 的客户端消息: " << buffer << std::endl;
-                    // 回声发送回客户端
-                    send(client_fd, buffer, bytes_read, 0);
-                } else if (bytes_read == 0) {
-                    std::cout << "通信 fd为 " << client_fd << " 的客户端断开连接" << std::endl;
-                    break;
-                } else {
-                    std::cerr << "接收消息失败!" << std::endl;
-                    break;
+                ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer), 0);
+                if (bytes_read <= 0) {
+                    std::cout << "客户端断开连接，fd: " << client_fd << std::endl;
+                    close(client_fd);
+                    break; // 退出循环，结束线程
                 }
+                // 回显数据
+                std::cout << "收到客户端消息: " << buffer << std::endl;
+                send(client_fd, buffer, bytes_read, 0);
             }
-            close(client_fd);
-        }).detach();
+        };
+        pool.enqueue(std::move(task)); // 将任务添加到线程池
     }
     close(listen_fd);
     return 0;
