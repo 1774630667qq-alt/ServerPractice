@@ -5,5 +5,8 @@
 EchoSever
 SocketTest
 
+# Build output directory
+build/
+
 # IDE-specific folders (optional, but good practice)
 .vscode/
