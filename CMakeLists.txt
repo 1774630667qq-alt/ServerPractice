@@ -8,3 +8,4 @@ include_directories(include)
 
 add_executable(main src/main.cpp)
 add_executable(EchoSever EchoSever.cpp)
+add_executable(EchoSeverByThreadPool EchoSeverByThreadPool.cpp)
