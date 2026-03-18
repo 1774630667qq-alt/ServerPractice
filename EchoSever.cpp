@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 16:27:59
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-18 20:04:36
+ * @LastEditTime: 2026-03-18 20:31:11
  * @FilePath: /ServerPractice/EchoSever.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -119,7 +119,7 @@ int main () {
 
                 struct epoll_event client_ev;
                 client_ev.data.fd = client_fd;
-                client_ev.events = EPOLLIN | EPOLLET; // 关注可读事件，并开启边缘触发(ET)
+                client_ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT; // 关注可读事件，并开启边缘触发(ET)
                 if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, &client_ev) == -1) {
                     std::cerr << "Epoll 添加客户端套接字失败!" << std::endl;
                     close(client_fd);
@@ -132,7 +132,7 @@ int main () {
                 inet_ntop(AF_INET, &client_addr.sin_addr, ip_str, sizeof(ip_str));
                 std::cout << "新客户端连接: " << ip_str << ":" << ntohs(client_addr.sin_port) << ", fd: " << client_fd << std::endl;
             } else {
-                std::thread([active_fd] {
+                std::thread([active_fd, epfd] {
                     char buffer[1024];
                     while (true) {
                         ssize_t bytes_read = recv(active_fd, buffer, sizeof(buffer), 0);
@@ -142,7 +142,11 @@ int main () {
                             send(active_fd, buffer, bytes_read, 0);
                         } else if (bytes_read == -1) {
                             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                // 没有更多数据可读了，退出循环
+                                // 没有更多数据可读了，回复修改
+                                struct epoll_event ev;
+                                ev.data.fd = active_fd;
+                                ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
+                                epoll_ctl(epfd, EPOLL_CTL_MOD, active_fd, &ev);
                                 break;
                             } else {
                                 std::cerr << "接收数据失败!" << std::endl;

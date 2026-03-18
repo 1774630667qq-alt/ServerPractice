@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 16:27:59
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-18 20:03:48
+ * @LastEditTime: 2026-03-18 20:23:59
  * @FilePath: /ServerPractice/EchoSever.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -102,13 +102,24 @@ int main () {
                     std::cerr << "Accept 失败!" << std::endl;
                     continue;
                 }
-                
+
                 setNonBlocking(client_fd);
 
                 // 将新客户端注册给 epoll
                 struct epoll_event client_ev;
                 client_ev.data.fd = client_fd;
-                client_ev.events = EPOLLIN | EPOLLET; // 关注可读事件，并开启边缘触发(ET)
+                /**
+                 * @brief 新增 EPOLLONESHOT 选项，用于防止“惊群效应”
+                 * @details
+                 * 在多线程环境下，当一个文件描述符就绪时，多个线程可能同时从 epoll_wait() 中被唤醒，
+                 * 这就是所谓的“惊群”。EPOLLONESHOT 确保一个文件描述符在被触发一次后，就会自动从 epoll 实例的
+                 * 监听列表中移除。这样，只有一个线程能处理该事件。
+                 * @warning
+                 * 处理完该文件描述符的 I/O 后，必须手动调用 epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev)
+                 * 重新注册该文件描述符，否则它将不再被监听，导致后续事件丢失。
+                 * (注：当前代码示例中缺少了重新注册的步骤，这是一个潜在的 BUG)
+                 */
+                client_ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
                 if (epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, &client_ev) == -1) {
                     std::cerr << "Epoll 添加客户端套接字失败!" << std::endl;
                     close(client_fd);
@@ -119,7 +130,7 @@ int main () {
                 }
             } else {
                 // 某个已连接的客户端有数据可读了，我们把这个任务交给线程池去处理
-                pool.enqueue([active_fd] {
+                pool.enqueue([active_fd, epfd] {
                     char buffer[1024];
                     while (true) {
                         ssize_t bytes_read = recv(active_fd, buffer, sizeof(buffer), 0);
@@ -129,7 +140,11 @@ int main () {
                             send(active_fd, buffer, bytes_read, 0);
                         } else if (bytes_read == -1) {
                             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                // 没有更多数据可读了，退出循环 等待下一次可读事件
+                                // 没有更多数据可读了，回复修改
+                                struct epoll_event ev;
+                                ev.data.fd = active_fd;
+                                ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
+                                epoll_ctl(epfd, EPOLL_CTL_MOD, active_fd, &ev);
                                 break;
                             } else {
                                 std::cerr << "接收数据失败!" << std::endl;
