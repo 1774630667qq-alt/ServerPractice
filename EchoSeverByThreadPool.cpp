@@ -18,7 +18,7 @@
 #include <cstring>      // 提供 memset
 #include <thread>       // 提供 std::thread
 #include "sys/epoll.h"    // 提供 epoll 函数及数据结构
-#include "include/ThreadPool.hpp" // 提供线程池类定义
+#include "ThreadPool.hpp" // 提供线程池类定义
 #include <fcntl.h>      // 提供 fcntl
 
 void setNonBlocking(int fd) {
