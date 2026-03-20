@@ -22,6 +22,7 @@ private:
     EventLoop* loop_;       ///< 大管家
     int listen_fd_;         ///< 监听套接字 (大门)
     Channel* acceptChannel_;///< 专门为大门分配的通信管道
+    int port_;              ///< 监听的端口号
 
     // 核心回调：当迎宾员成功接到新客人后，他不知道怎么安排客人，
     // 他必须通过这个回调函数，把新客人的 fd 交给餐厅大老板 (TcpServer) 去处理。

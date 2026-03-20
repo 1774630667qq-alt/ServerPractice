@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-19 16:39:02
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-19 17:06:27
+ * @LastEditTime: 2026-03-19 17:17:55
  * @FilePath: /ServerPractice/src/Accept.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -18,7 +18,7 @@
 #include <fcntl.h>      // 提供 fcntl
 
 namespace MyServer {
-    Acceptor::Acceptor(EventLoop* loop, int port) : loop_(loop), listen_fd_(-1), acceptChannel_(nullptr) {
+    Acceptor::Acceptor(EventLoop* loop, int port) : loop_(loop),port_(port), listen_fd_(-1), acceptChannel_(nullptr) {
         // --- 1. 创建监听套接字 ---
         listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
         if (listen_fd_ == -1) {
@@ -63,7 +63,8 @@ namespace MyServer {
             close(listen_fd_);
             exit(EXIT_FAILURE);
         }
-        std::cout << "服务器启动，正在监听 " << ntohs(((struct sockaddr_in*)&listen_fd_)->sin_port) << " 端口..." << std::endl;
+        std::cout << "服务器启动，正在监听 " << port_ << " 端口..." << std::endl;
+        acceptChannel_->enableReading();
     }
 
     void Acceptor::handleRead() {

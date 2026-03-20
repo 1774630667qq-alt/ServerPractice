@@ -32,22 +32,27 @@ file(GLOB SRC_FILES "src/*.cpp")
 # @param <items>... (如 "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp") 要移除的具体项。因 GLOB 返回绝对路径，此处需拼接 CMAKE_CURRENT_SOURCE_DIR 以精确匹配并剔除 main.cpp。
 list(REMOVE_ITEM SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
 
+# @brief 将公共源文件编译成一个静态库，避免同一个文件被重复编译多次
+# @param <name> (如 server_core) 库的名称
+# @param [STATIC|SHARED|MODULE] 指定创建静态库、动态库还是模块库
+add_library(server_core STATIC ${SRC_FILES})
+
 # @brief 使用指定的源文件来构建目标可执行文件。
 # @param <name> (如 main) 构建出的可执行文件的名称，此名称在整个 CMake 项目中必须全局唯一。
 # @param [WIN32] (可选) 用于 Windows 平台，指示构建一个基于 GUI 的 Win32 应用程序（无控制台窗口）。
 # @param [MACOSX_BUNDLE] (可选) 用于 macOS 平台，指示构建一个 App Bundle（GUI 应用程序）。
 # @param [EXCLUDE_FROM_ALL] (可选) 如果指定，该目标将不会包含在默认的构建目标（如 make all）中，必须显式指定构建。
 # @param <source>... (如 src/main.cpp) 用于编译生成该可执行文件所需的源文件列表。
-add_executable(main src/main.cpp ${SRC_FILES})
+add_executable(main src/main.cpp)
 
-add_executable(EchoSever EchoSever.cpp ${SRC_FILES})
+add_executable(EchoSever EchoSever.cpp)
 
-add_executable(EchoSeverByThreadPool EchoSeverByThreadPool.cpp ${SRC_FILES})
+add_executable(EchoSeverByThreadPool EchoSeverByThreadPool.cpp)
 
 # @brief 将给定的库或标志链接到指定目标上。
 # @param <target> (如 main) 必须是由 add_executable 或 add_library 创建的目标名称。
 # @param <PRIVATE|PUBLIC|INTERFACE> 声明依赖的传播范围。PRIVATE 表示仅该目标自身链接该库。
 # @param <item>... (如 pthread) 要链接的系统库名称（Linux 环境下使用 std::thread 等需链接 pthread）。
-target_link_libraries(main PRIVATE pthread)
-target_link_libraries(EchoSever PRIVATE pthread)
-target_link_libraries(EchoSeverByThreadPool PRIVATE pthread)
+target_link_libraries(main PRIVATE server_core pthread)
+target_link_libraries(EchoSever PRIVATE server_core pthread)
+target_link_libraries(EchoSeverByThreadPool PRIVATE server_core pthread)
