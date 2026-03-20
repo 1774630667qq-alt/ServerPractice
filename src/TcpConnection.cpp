@@ -3,6 +3,7 @@
 #include "EventLoop.hpp"
 #include "Channel.hpp"
 #include <sys/socket.h>
+#include <unistd.h>
 
 namespace MyServer {
     TcpConnection::TcpConnection(EventLoop* loop, int fd)
@@ -15,18 +16,17 @@ namespace MyServer {
 
     TcpConnection::~TcpConnection() {
         delete channel_;
+        ::close(fd_); // 必须关闭底层文件描述符，防止幽灵连接
     }
 
     void TcpConnection::handleRead() {
         int active_fd = channel_->getFd();
         while (true) {
-            std::cout << "up to this" << std::endl;
-            int bytes_read = recv(active_fd, buffer_.data(), buffer_.size(), 0);
-            std::cout << "bytes_read: " << bytes_read << std::endl;
+            char buf[1024];
+            int bytes_read = recv(active_fd, buf, sizeof(buf), 0);
             if (bytes_read > 0) {
-                buffer_[bytes_read] = '\0'; // 确保字符串结尾
                 if (messageCallback_) {
-                    messageCallback_(this, std::string(buffer_));
+                    messageCallback_(this, std::string(buf, bytes_read));
                 }
             } else if (bytes_read == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -34,16 +34,20 @@ namespace MyServer {
                     break;
                 } else {
                     std::cerr << "Recv 失败!" << std::endl;
-                    if (closeCallback_) {
-                        closeCallback_(fd_);
+                    // 将回调拷贝到栈上，防止对象自杀导致段错误
+                    auto cb = closeCallback_;
+                    if (cb) {
+                        cb(fd_);
                     }
                     break;
                 }
             } else {
                 // bytes_read == 0，客户端断开连接
                 std::cout << "客户端 fd " << active_fd << " 断开连接" << std::endl;
-                if (closeCallback_) {
-                    closeCallback_(fd_);
+                // 同理，拷贝到栈上安全执行
+                auto cb = closeCallback_;
+                if (cb) {
+                    cb(fd_);
                 }
                 break;
             }
