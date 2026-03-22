@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 15:29:51
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-22 22:38:48
+ * @LastEditTime: 2026-03-22 22:47:28
  * @FilePath: /ServerPractice/src/TcpConnection.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -121,9 +121,26 @@ namespace MyServer {
                     // 没有完整消息了，退出解包循环
                     break;
                 }
-                // 触发业务层回调，告诉大老板收到消息了
-                if (messageCallback_) {
-                    messageCallback_(this, msg);
+                ssize_t bytes_sent = ::send(fd_, msg.c_str(), msg.size(), 0);
+                std::cout << "实际发送字节数: " << bytes_sent << std::endl;
+                if (bytes_sent == -1) {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        // 发送缓冲区满了，暂时无法发送，应该把剩余数据放回 writeBuffer_ 中，等下次可写事件再发
+                        writeBuffer_.append(msg.c_str(), msg.size());
+                        break; // 退出循环，等下次可写事件再发
+                    } else {
+                        std::cerr << "Send 失败!" << std::endl;
+                        // 同理，拷贝到栈上安全执行
+                        auto cb = closeCallback_;
+                        if (cb) {
+                            cb(fd_);
+                        }
+                        break;
+                    }
+                } else if (static_cast<size_t>(bytes_sent) < msg.size()) {
+                    // 只发出了一部分数据，也需要把剩余数据放回 writeBuffer_ 中
+                    writeBuffer_.append(msg.c_str() + bytes_sent, msg.size() - bytes_sent);
+                    break; // 退出循环，等下次可写事件再发
                 }
             }
         } 
