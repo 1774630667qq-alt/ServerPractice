@@ -9,6 +9,8 @@
 #pragma once
 #include <functional>
 #include <sys/epoll.h>
+#include <cstdint>
+#include <utility>
 
 namespace MyServer {
 
@@ -32,6 +34,7 @@ private:
     // 这里保存的是高层业务逻辑注册进来的代码块。
     std::function<void()> readCallback_;  ///< 发生可读事件时要执行的函数
     std::function<void()> closeCallback_; ///< 发生关闭事件时要执行的函数
+    std::function<void()> writeCallback_; ///< 发生可写事件时要执行的函数 
 
 public:
     /**
@@ -65,6 +68,21 @@ public:
      */
     void setCloseCallback(std::function<void()> cb) { closeCallback_ = std::move(cb); }
 
+    /**
+     * 
+     */
+    void setWriteCallback(std::function<void()> cb) { writeCallback_ = std::move(cb); }
+
+    /**
+     * 
+     */
+    void enableWriting();
+
+    /**
+     * 
+     */
+    void disableWriting();
+    
     /**
      * @brief 开启对“可读事件”的监听
      * @details 内部不仅会添加 EPOLLIN 标志，还会开启 EPOLLET (边缘触发) 模式。
