@@ -2,19 +2,19 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 15:29:42
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-20 15:46:19
+ * @LastEditTime: 2026-03-22 21:00:09
  * @FilePath: /ServerPractice/include/TcpConnection.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #pragma once
 #include <functional>
 #include <string>
+#include "Buffer.hpp"
 
 namespace MyServer {
 
 class EventLoop;
 class Channel;
-class Buffer;
 
 /**
  * @brief TCP 连接类：代表一个已经建立连接的客户端 (专属酒席)
@@ -27,7 +27,7 @@ private:
     EventLoop* loop_;       ///< 大管家 (所属的事件循环)
     int fd_;                ///< 与客户端通信的专属 fd
     Channel* channel_;      ///< 属于这个 fd 的专属通信管道 (服务员)
-    Buffer* buffer_;    ///< 读数据的缓冲区
+    Buffer buffer_;         ///< 读数据的缓冲区
 
     // --- 给上层大老板 (TcpServer) 留的汇报接口 ---
     
