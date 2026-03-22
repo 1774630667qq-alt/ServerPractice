@@ -35,34 +35,40 @@ private:
 
 public:
     /**
-     * @brief 构造函数
+     * @brief 构造函数：初始化 Channel
      * @param loop 所属的 EventLoop 指针
      * @param fd 需要被封装的文件描述符
+     * @note 仅初始化变量，并不会向底层的 epoll 树中注册自身
      */
     Channel(EventLoop* loop, int fd);
     ~Channel() = default;
 
     /**
-     * @brief 核心分发逻辑：根据实际发生的事件 (revents_)，调用对应的回调函数
-     * * 这个函数是由 EventLoop 在 epoll_wait 醒来后主动调用的！
+     * @brief 核心事件分发器：根据 epoll_wait 返回的具体事件 (revents_) 执行相应回调
+     * @details 
+     * - EPOLLHUP & !EPOLLIN: 对端关闭连接且无数据可读时，触发 closeCallback_
+     * - EPOLLERR: 发生错误时，触发 closeCallback_
+     * - EPOLLIN | EPOLLPRI | EPOLLRDHUP: 有数据可读或紧急数据到达时，触发 readCallback_
+     * @note 此方法由 EventLoop 在底层 epoll_wait 触发后主动调用。
      */
     void handleEvent();
 
     /**
-     * @brief 注册读事件回调函数
+     * @brief 注册读事件回调函数 (通常在有新数据到达、或者新连接建立时被触发)
      * @param cb 外部传入的 Lambda 表达式或函数指针
      */
     void setReadCallback(std::function<void()> cb) { readCallback_ = std::move(cb); }
 
     /**
-     * @brief 注册关闭事件回调函数
+     * @brief 注册关闭事件回调函数 (用于对端异常断开、发生错误时触发，便于上层清理资源)
+     * @param cb 外部传入的 Lambda 表达式或函数指针
      */
     void setCloseCallback(std::function<void()> cb) { closeCallback_ = std::move(cb); }
 
     /**
      * @brief 开启对“可读事件”的监听
-     * * 业务层调用这个方法后，Channel 会修改自己的 events_，
-     * 并通知底层的 EventLoop 去更新 epoll 树。
+     * @details 内部不仅会添加 EPOLLIN 标志，还会开启 EPOLLET (边缘触发) 模式。
+     * 修改自身的 events_ 掩码后，会调用所属 EventLoop 的 updateChannel 更新底层的 epoll 实例。
      */
     void enableReading();
 

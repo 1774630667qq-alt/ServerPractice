@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 16:06:48
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-20 16:06:54
+ * @LastEditTime: 2026-03-22 20:44:14
  * @FilePath: /ServerPractice/include/TcpServer.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -34,27 +34,43 @@ private:
     std::function<void(TcpConnection*, const std::string&)> onMessageCallback_;
 
 public:
+    /**
+     * @brief 构造函数：初始化服务器实例
+     * @param loop 外部实例化的 EventLoop 指针
+     * @param port 服务器需要监听绑定的端口号
+     * @details 内部会自动创建负责接收连接的 Acceptor 迎宾员，并绑定新连接的调度回调(newConnection)。
+     */
     TcpServer(EventLoop* loop, int port);
+
+    /**
+     * @brief 析构函数：释放 Acceptor 并销毁账本(connections_)中所有尚未断开的客户端连接资源。
+     */
     ~TcpServer();
 
     /**
-     * @brief 启动服务器
+     * @brief 启动服务器：通知内部 Acceptor 开始 listen 并注册到 epoll 中
      */
     void start();
 
     /**
      * @brief 迎宾员接到新客人后，触发此函数
-     * @param fd 新客人的文件描述符
+     * @details 内部会为新连接实例化 TcpConnection 对象，并将其注册到 connections_ 账本中。
+     * 另外会给该连接分配对应的读事件回调(onMessageCallback_) 和 退出回调(removeConnection)。
+     * @param fd 客户端的文件描述符
      */
     void newConnection(int fd);
 
     /**
-     * @brief 客人离开时，触发此函数 (主要为了从账本 connections_ 中删掉记录)
-     * @param fd 离开的客人的文件描述符
+     * @brief 客人离开或连接异常时，触发此函数
+     * @details 核心职责是：在底层抛出销毁请求时，从账本(connections_)中将该连接擦除，并销毁该 TcpConnection 对象的堆内存。
+     * @param fd 需要销毁的客户端文件描述符
      */
     void removeConnection(int fd);
 
-    // --- 给外部开发者的接口 ---
+    /**
+     * @brief 业务逻辑暴露接口：注册当收到客户端消息时触发的回调
+     * @param cb 回调签名，提供对应的连接对象指针 `TcpConnection*` 以及解码出的纯文本信息 `const std::string&`
+     */
     void setOnMessageCallback(std::function<void(TcpConnection*, const std::string&)> cb) {
         onMessageCallback_ = std::move(cb);
     }

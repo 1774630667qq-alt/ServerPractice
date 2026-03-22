@@ -31,26 +31,29 @@ private:
 
 public:
     /**
-     * @brief 构造函数：负责调用 epoll_create1 初始化 epfd_
+     * @brief 构造函数：负责调用 epoll_create1(0) 初始化 epfd_，并预分配活跃事件数组
+     * @note 如果内核不支持或创建失败，将直接打印错误并退出程序 (exit)。
      */
     EventLoop();
 
     /**
-     * @brief 析构函数：负责 close(epfd_)
+     * @brief 析构函数：负责 close(epfd_) 释放操作系统的 epoll 资源
      */
     ~EventLoop();
 
     /**
      * @brief 开启事件分发死循环 (核心发动机)
-     * * 只要 quit_ 为 false，就一直 while 循环调用 epoll_wait。
+     * @details 只要 quit_ 为 false，就一直阻塞调用 epoll_wait。
+     * 一旦有事件返回，遍历所有活跃事件对应的 Channel 对象，通知其 handleEvent() 进行回调派发。
      */
     void loop();
 
     /**
      * @brief 更新 Channel 的 epoll 监听状态
-     * * 当 Channel 想监听新事件时，会调用此函数。
-     * 本函数内部会调用系统 API: epoll_ctl。
-     * * @param channel 需要被更新监听状态的 Channel 对象指针
+     * @details 接收一个 Channel 并根据其内部的 events_ 掩码更新 epoll 树。
+     * 内部策略：默认先尝试 EPOLL_CTL_MOD (修改)。如果内核返回 ENOENT 表示该 fd 尚未注册过，
+     * 此时便自动退回使用 EPOLL_CTL_ADD (添加) 来注册。
+     * @param channel 需要被更新监听状态的 Channel 对象指针
      */
     void updateChannel(Channel* channel);
 };

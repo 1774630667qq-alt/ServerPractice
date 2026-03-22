@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 16:27:59
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-18 20:31:11
+ * @LastEditTime: 2026-03-21 20:26:17
  * @FilePath: /ServerPractice/EchoSever.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -74,6 +74,7 @@ int main () {
         close(listen_fd);
         return -1;
     }
+    setNonBlocking(listen_fd); // 将监听套接字设置为非阻塞模式
     std::cout << "Listen 成功，服务器正在监听 8080 端口..." << std::endl;
     
     int epfd = epoll_create1(0);

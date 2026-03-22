@@ -1,7 +1,16 @@
+/*
+ * @Author: Zhang YuHua 1774630667@qq.com
+ * @Date: 2026-03-20 15:29:51
+ * @LastEditors: Zhang YuHua 1774630667@qq.com
+ * @LastEditTime: 2026-03-22 20:50:18
+ * @FilePath: /ServerPractice/src/TcpConnection.cpp
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 #include <iostream>
 #include "TcpConnection.hpp"
 #include "EventLoop.hpp"
 #include "Channel.hpp"
+#include "Buffer.hpp"
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -25,8 +34,17 @@ namespace MyServer {
             char buf[1024];
             int bytes_read = recv(active_fd, buf, sizeof(buf), 0);
             if (bytes_read > 0) {
-                if (messageCallback_) {
-                    messageCallback_(this, std::string(buf, bytes_read));
+                buffer_->append(buf, bytes_read); // 把读到的数据追加到缓冲区
+                while (true) {
+                    std::string msg = buffer_->extractMessage();
+                    if (msg.empty()) {
+                        // 没有完整消息了，退出内层循环，继续等待下一次可读事件
+                        break;
+                    }
+                    // 触发上层业务逻辑回调，告诉大老板收到了一条完整消息
+                    if (messageCallback_) {
+                        messageCallback_(this, msg);
+                    }
                 }
             } else if (bytes_read == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -55,6 +73,26 @@ namespace MyServer {
     }
 
     void TcpConnection::send(const std::string& msg) {
-        ::send(fd_, msg.c_str(), msg.size(), 0);
+        int sent_bytes = 0;
+        int ret = 0;
+        while (true) {
+            ret = ::send(fd_, msg.c_str() + sent_bytes, msg.size() - sent_bytes, 0);
+            if (ret == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // 发送缓冲区满了，暂时无法继续发送
+                    std::cerr << "发送缓冲区满了，消息未完全发送!" << std::endl;
+                    break;
+                } else {
+                    std::cerr << "Send 失败!" << std::endl;
+                    break;
+                }
+            } else {
+                sent_bytes += ret;
+                if (sent_bytes >= static_cast<int>(msg.size())) {
+                    // 消息已经完全发送了
+                    break;  
+                }
+            }
+        }
     }
 }

@@ -29,23 +29,41 @@ private:
     std::function<void(int)> newConnectionCallback_; 
 
 public:
+    /**
+     * @brief 构造函数：初始化服务器监听大门
+     * @details 
+     * 1. 创建 IPv4 TCP 监听套接字
+     * 2. 开启 SO_REUSEADDR 端口复用，防止重启时端口占用报错
+     * 3. 绑定(bind)传入的本地端口
+     * 4. 设置监听套接字为非阻塞(O_NONBLOCK)模式
+     * 5. 创建并初始化监听套接字专属的 acceptChannel_
+     * @param loop 所属的 EventLoop 大管家
+     * @param port 需监听的本机端口
+     */
     Acceptor(EventLoop* loop, int port);
+
+    /**
+     * @brief 析构函数：清理监听套接字(close)及专属通信管道的内存
+     */
     ~Acceptor();
 
     /**
      * @brief 供上层大老板调用的回调注册接口
+     * @param cb 接收新连接套接字描述符 `int client_fd` 的回调函数
      */
     void setNewConnectionCallback(std::function<void(int)> cb) {
         newConnectionCallback_ = std::move(cb);
     }
 
     /**
-     * @brief 底层处理可读事件的逻辑 (被 acceptChannel_ 触发)
+     * @brief 接收新连接的可读事件核心逻辑 (由 acceptChannel_ 触发)
+     * @details 由于是并发及非阻塞模式，会在 while(true) 中循环执行 accept() 获取所有 pending 的连接，
+     * 并将每一个新客户端套接字设为非阻塞模式，直到返回 EAGAIN 才结束本轮读取，最后触发 newConnectionCallback_ 向上抛出。
      */
     void handleRead();
 
     /**
-     * @brief 开始工作：把 acceptChannel_ 挂载到 EventLoop 上
+     * @brief 开始迎客：调用 listen() 开启监听，并把 acceptChannel_ 的读事件挂载到底层 epoll 树中
      */
     void listen();
 };
