@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 15:29:51
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-22 22:47:28
+ * @LastEditTime: 2026-03-22 22:57:33
  * @FilePath: /ServerPractice/src/TcpConnection.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -76,76 +76,56 @@ namespace MyServer {
     }
 
     void TcpConnection::send(const std::string& msg) {
-        // 1. 检查是否有未发送完的数据在缓冲区里，如果有，先把它们发完
+        // 1. 如果写缓冲区已经有数据，说明之前就没发完，TCP 处于“堵车”状态。
+        // 此时绝对不能直接去插队，必须把新消息排在写缓冲区的末尾！
         if (writeBuffer_.size() > 0) {
-            while (true) {
-                std::string msg = writeBuffer_.extractMessage();
-                if (msg.empty()) {
-                    // 没有完整消息了，退出解包循环
-                    break;
-                }
-                ::send(fd_, msg.c_str(), msg.size(), 0);
+            writeBuffer_.append(msg.data(), msg.size());
+            return;
+        }
+
+        // 2. 如果写缓冲区是空的，说明一路畅通，尝试直接发送！
+        ssize_t bytes_sent = ::send(fd_, msg.data(), msg.size(), 0);
+        
+        // 3. 处理发送结果
+        if (bytes_sent == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                bytes_sent = 0; // 缓冲区满了，一个字节都没发出去，正常情况
+            } else {
+                std::cerr << "Send 失败! errno=" << errno << std::endl;
+                auto cb = closeCallback_;
+                if (cb) cb(fd_);
+                return;
             }
         }
 
-        // 2. 直接发送消息
-        ssize_t bytes_sent = ::send(fd_, msg.c_str(), msg.size(), 0);
-        std::cout << "实际发送字节数: " << bytes_sent << std::endl;
-
-        // 3. 检查是否全部发送成功了
-        if (bytes_sent == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // 发送缓冲区满了，暂时无法发送，应该把剩余数据放到 writeBuffer_ 中，等下次可写事件再发
-                writeBuffer_.append(msg.c_str(), msg.size());
-                channel_->enableWriting(); // 启用写事件，等下次可写时再发
-            } else {
-                std::cerr << "Send 失败!" << std::endl;
-                // 同理，拷贝到栈上安全执行
-                auto cb = closeCallback_;
-                if (cb) {
-                    cb(fd_);
-                }
-            }
-        } else if (static_cast<size_t>(bytes_sent) < msg.size()) {
-            // 只发出了一部分数据，也需要把剩余数据放到 writeBuffer_ 中
-            writeBuffer_.append(msg.c_str() + bytes_sent, msg.size() - bytes_sent);
-            channel_->enableWriting(); // 启用写事件，等下次可写时再发
+        // 4. 如果还有没发完的剩余数据，存入 writeBuffer_，并让大堂经理开始盯防写事件！
+        if (static_cast<size_t>(bytes_sent) < msg.size()) {
+            writeBuffer_.append(msg.data() + bytes_sent, msg.size() - bytes_sent);
+            channel_->enableWriting(); // 开启 EPOLLOUT 监听
         } 
     }
 
     void TcpConnection::handleWrite() {
+        // 这个函数只有在 epoll 发现底层网卡腾出空位时才会被调用
         if (writeBuffer_.size() > 0) {
-            while (true) {
-                std::string msg = writeBuffer_.extractMessage();
-                if (msg.empty()) {
-                    // 没有完整消息了，退出解包循环
-                    break;
-                }
-                ssize_t bytes_sent = ::send(fd_, msg.c_str(), msg.size(), 0);
-                std::cout << "实际发送字节数: " << bytes_sent << std::endl;
-                if (bytes_sent == -1) {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        // 发送缓冲区满了，暂时无法发送，应该把剩余数据放回 writeBuffer_ 中，等下次可写事件再发
-                        writeBuffer_.append(msg.c_str(), msg.size());
-                        break; // 退出循环，等下次可写事件再发
-                    } else {
-                        std::cerr << "Send 失败!" << std::endl;
-                        // 同理，拷贝到栈上安全执行
-                        auto cb = closeCallback_;
-                        if (cb) {
-                            cb(fd_);
-                        }
-                        break;
-                    }
-                } else if (static_cast<size_t>(bytes_sent) < msg.size()) {
-                    // 只发出了一部分数据，也需要把剩余数据放回 writeBuffer_ 中
-                    writeBuffer_.append(msg.c_str() + bytes_sent, msg.size() - bytes_sent);
-                    break; // 退出循环，等下次可写事件再发
+            // 直接无脑把缓冲区里所有的数据推给网卡
+            ssize_t bytes_sent = ::send(fd_, writeBuffer_.data(), writeBuffer_.size(), 0);
+            
+            if (bytes_sent > 0) {
+                // 发送成功了多少，就从缓冲区里删掉多少！
+                writeBuffer_.retrieve(bytes_sent); 
+            } else if (bytes_sent == -1) {
+                if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                    std::cerr << "handleWrite 底层发送失败!" << std::endl;
+                    auto cb = closeCallback_;
+                    if (cb) cb(fd_);
+                    return;
                 }
             }
-        } 
+        }
+
+        // ⭐ 极其致命的判断：如果全部发完了，务必关闭写事件！
         if (writeBuffer_.size() == 0) {
-            // 已经把所有数据发完了，关闭写事件
             channel_->disableWriting();
         }
     }

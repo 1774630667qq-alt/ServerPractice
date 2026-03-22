@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-22 20:28:39
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-22 20:28:48
+ * @LastEditTime: 2026-03-22 22:50:19
  * @FilePath: /ServerPractice/include/Buffer.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -34,6 +34,22 @@ public:
      */
     size_t size() const {
         return buf_.size();
+    }
+
+    /**
+     * @brief 获取底层缓冲区的首地址 (用于 send)
+     */
+    const char* data() const {
+        return buf_.data();
+    }
+
+    /**
+     * @brief 从缓冲区头部删掉指定长度的数据 (发送成功后调用)
+     */
+    void retrieve(size_t len) {
+        if (len <= buf_.size()) {
+            buf_.erase(0, len);
+        }
     }
 
     /**
