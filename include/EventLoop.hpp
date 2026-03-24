@@ -2,12 +2,14 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-19 15:20:10
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-19 15:46:55
+ * @LastEditTime: 2026-03-24 16:55:41
  * @FilePath: /ServerPractice/include/EventLoop.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #pragma once
 #include <vector>
+#include <functional>
+#include <mutex>
 #include <sys/epoll.h>
 
 namespace MyServer {
@@ -27,7 +29,24 @@ private:
     bool quit_;     ///< 控制死循环是否退出的标志
 
     // 这是一个预先分配好大小的数组，用来接收 epoll_wait 返回的活跃事件
-    std::vector<struct epoll_event> activeEvents_; 
+    std::vector<struct epoll_event> activeEvents_;
+    
+    // --- 新增：多线程通信组件 ---
+    int wakeupFd_;                          ///< 跨线程唤醒的呼叫铃 (eventfd)
+    Channel* wakeupChannel_;                ///< 封装呼叫铃的 Channel
+
+    std::mutex mutex_;                      ///< 保护任务队列的互斥锁
+    std::vector<std::function<void()>> pendingFunctors_; ///< 出餐台 (任务队列)
+
+    /**
+     * @brief 处理呼叫铃响起的事件 (读取 eventfd)
+     */
+    void handleWakeup();
+
+    /**
+     * @brief 执行所有出餐台上的任务
+     */
+    void doPendingFunctors();
 
 public:
     /**
@@ -56,6 +75,19 @@ public:
      * @param channel 需要被更新监听状态的 Channel 对象指针
      */
     void updateChannel(Channel* channel);
+
+    // --- 新增：跨线程投递任务的接口 ---
+    
+    /**
+     * @brief 唤醒沉睡在 epoll_wait 的主线程
+     */
+    void wakeup();
+
+    /**
+     * @brief 把任务扔进出餐台，并敲响呼叫铃
+     * @param cb 需要在主线程执行的函数
+     */
+    void queueInLoop(std::function<void()> cb);
 };
 
 } // namespace MyServer

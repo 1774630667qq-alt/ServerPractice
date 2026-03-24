@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 15:29:42
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-22 22:15:35
+ * @LastEditTime: 2026-03-24 17:31:52
  * @FilePath: /ServerPractice/include/TcpConnection.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -61,7 +61,10 @@ public:
     void handleRead(); 
 
     /**
-     * 
+     * @brief 处理套接字可写事件
+     * @details 当底层 TCP 写缓冲区有空闲空间时（由 epoll 触发 EPOLLOUT），该函数会被调用。
+     * 它负责将应用层写缓冲区 (writeBuffer_) 中积压的数据推送到内核网络栈中。
+     * 如果所有数据都发送完毕，会取消对 EPOLLOUT 事件的监听，防止 CPU 空转。
      */
     void handleWrite();
 
@@ -74,13 +77,27 @@ public:
     }
 
     /**
-     * @brief 同步发送数据到客户端套接字
+     * @brief 发送数据到客户端 (非阻塞异步发送逻辑)
      * @param msg 要发送的字符串数据
-     * @note 当前版本为直接调用底层系统 send()。如果缓冲区满，可能会导致发送不完整。后续可扩展应用层发送缓冲区。
+     * @details 
+     * 1. 如果当前的写缓冲区 (writeBuffer_) 是空的，则直接尝试调用系统的 `send()` 发送数据。
+     * 2. 如果一次性没有发完（发生了 EAGAIN），或者写缓冲区里本身就有积压的数据，
+     *    就把剩余未发送的数据追加到写缓冲区中，并向 epoll 注册 EPOLLOUT 可写事件。
+     *    由后续触发的 handleWrite() 负责继续发送。
      */
     void send(const std::string& msg);
 
+    /**
+     * @brief 获取当前连接所绑定的客户端文件描述符
+     * @return 客户端的 Socket FD
+     */
     int getFd() const { return fd_; }
+
+    /**
+     * @brief 获取当前连接所属的事件循环 (EventLoop) 大管家
+     * @return 指向所在的 EventLoop 对象的指针
+     */
+    EventLoop* getLoop() { return loop_; };
 };
 
 } // namespace MyServer

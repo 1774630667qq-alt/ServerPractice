@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 15:29:51
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-22 22:57:33
+ * @LastEditTime: 2026-03-24 17:31:55
  * @FilePath: /ServerPractice/src/TcpConnection.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -33,6 +33,14 @@ namespace MyServer {
         int active_fd = channel_->getFd();
         while (true) {
             char buf[1024];
+            /**
+             * @brief 从套接字接收数据 (系统调用)
+             * @param sockfd  用于接收数据的套接字文件描述符 (此处的 active_fd)
+             * @param buf     指向存放接收数据缓冲区的指针
+             * @param len     缓冲区的最大长度
+             * @param flags   接收操作的标志位，通常设为 0
+             * @return 成功返回实际接收到的字节数；返回 0 表示对端已正常关闭连接；失败返回 -1 并设置 errno
+             */
             int bytes_read = recv(active_fd, buf, sizeof(buf), 0);
             if (bytes_read > 0) {
                 buffer_.append(buf, bytes_read); // 把读到的数据追加到缓冲区
@@ -84,6 +92,14 @@ namespace MyServer {
         }
 
         // 2. 如果写缓冲区是空的，说明一路畅通，尝试直接发送！
+        /**
+         * @brief 向套接字发送数据 (系统调用)
+         * @param sockfd  用于发送数据的套接字文件描述符 (此处的 fd_)
+         * @param buf     指向包含要发送数据的缓冲区的指针
+         * @param len     要发送数据的字节数
+         * @param flags   发送操作的标志位，通常设为 0
+         * @return 成功返回实际发送的字节数（在非阻塞模式下可能小于请求的长度）；失败返回 -1 并设置 errno
+         */
         ssize_t bytes_sent = ::send(fd_, msg.data(), msg.size(), 0);
         
         // 3. 处理发送结果
@@ -109,6 +125,14 @@ namespace MyServer {
         // 这个函数只有在 epoll 发现底层网卡腾出空位时才会被调用
         if (writeBuffer_.size() > 0) {
             // 直接无脑把缓冲区里所有的数据推给网卡
+            /**
+             * @brief 向套接字发送数据 (系统调用)
+             * @param sockfd  用于发送数据的套接字文件描述符 (此处的 fd_)
+             * @param buf     指向写缓冲区数据的指针
+             * @param len     写缓冲区当前积压数据的字节数
+             * @param flags   发送操作的标志位，通常设为 0
+             * @return 成功返回实际发送的字节数；失败返回 -1 并设置 errno
+             */
             ssize_t bytes_sent = ::send(fd_, writeBuffer_.data(), writeBuffer_.size(), 0);
             
             if (bytes_sent > 0) {
