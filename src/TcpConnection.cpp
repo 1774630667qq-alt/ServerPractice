@@ -30,6 +30,8 @@ namespace MyServer {
     }
 
     void TcpConnection::handleRead() {
+        // 使用智能指针守卫，防止在回调过程中自己被析构导致崩溃
+        auto guard = shared_from_this();
         int active_fd = channel_->getFd();
         while (true) {
             char buf[1024];
@@ -53,7 +55,7 @@ namespace MyServer {
                     // 将回调拷贝到栈上，防止对象自杀导致段错误
                     auto cb = closeCallback_;
                     if (cb) {
-                        cb(fd_);
+                    cb(guard);
                     }
                     break;
                 }
@@ -63,7 +65,7 @@ namespace MyServer {
                 // 同理，拷贝到栈上安全执行
                 auto cb = closeCallback_;
                 if (cb) {
-                    cb(fd_);
+                cb(guard);
                 }
                 break;
             }
@@ -78,12 +80,13 @@ namespace MyServer {
             }
             // 触发业务层回调，告诉大老板收到消息了
             if (messageCallback_) {
-                messageCallback_(this, msg);
+                messageCallback_(guard, msg);
             }
         }
     }
 
     void TcpConnection::send(const std::string& msg) {
+        auto guard = shared_from_this();
         // 1. 如果写缓冲区已经有数据，说明之前就没发完，TCP 处于“堵车”状态。
         // 此时绝对不能直接去插队，必须把新消息排在写缓冲区的末尾！
         if (writeBuffer_.size() > 0) {
@@ -109,7 +112,7 @@ namespace MyServer {
             } else {
                 std::cerr << "Send 失败! errno=" << errno << std::endl;
                 auto cb = closeCallback_;
-                if (cb) cb(fd_);
+            if (cb) cb(guard);
                 return;
             }
         }
@@ -122,6 +125,7 @@ namespace MyServer {
     }
 
     void TcpConnection::handleWrite() {
+        auto guard = shared_from_this();
         // 这个函数只有在 epoll 发现底层网卡腾出空位时才会被调用
         if (writeBuffer_.size() > 0) {
             // 直接无脑把缓冲区里所有的数据推给网卡
@@ -142,7 +146,7 @@ namespace MyServer {
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
                     std::cerr << "handleWrite 底层发送失败!" << std::endl;
                     auto cb = closeCallback_;
-                    if (cb) cb(fd_);
+                if (cb) cb(guard);
                     return;
                 }
             }

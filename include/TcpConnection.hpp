@@ -9,6 +9,7 @@
 #pragma once
 #include <functional>
 #include <string>
+#include <memory>
 #include "Buffer.hpp"
 
 namespace MyServer {
@@ -22,7 +23,7 @@ class Channel;
  * * 当这个客户端发来消息时，它负责调用 recv() 把数据读出来，
  * * 然后把读到的数据通过回调函数 (messageCallback_) 汇报给大老板 (TcpServer)。
  */
-class TcpConnection {
+class TcpConnection : public std::enable_shared_from_this<TcpConnection> {
 private:
     EventLoop* loop_;       ///< 大管家 (所属的事件循环)
     int fd_;                ///< 与客户端通信的专属 fd
@@ -32,11 +33,11 @@ private:
 
     // --- 给上层大老板 (TcpServer) 留的汇报接口 ---
     
-    ///< 当收到客人发来的消息时，触发此回调。参数1是当前连接对象，参数2是收到的字符串
-    std::function<void(TcpConnection*, const std::string&)> messageCallback_;
+    ///< 当收到客人发来的消息时，触发此回调。参数1是当前连接的智能指针，参数2是收到的字符串
+    std::function<void(const std::shared_ptr<TcpConnection>&, const std::string&)> messageCallback_;
     
-    ///< 当客人断开连接时，触发此回调。告诉大老板“客人走了，请把账本上的记录划掉”
-    std::function<void(int)> closeCallback_;
+    ///< 当客人断开连接时，触发此回调。参数是当前连接的智能指针
+    std::function<void(const std::shared_ptr<TcpConnection>&)> closeCallback_;
 
 public:
     /**
@@ -69,10 +70,10 @@ public:
     void handleWrite();
 
     // --- 注册回调的 Setter ---
-    void setMessageCallback(std::function<void(TcpConnection*, const std::string&)> cb) {
+    void setMessageCallback(std::function<void(const std::shared_ptr<TcpConnection>&, const std::string&)> cb) {
         messageCallback_ = std::move(cb);
     }
-    void setCloseCallback(std::function<void(int)> cb) {
+    void setCloseCallback(std::function<void(const std::shared_ptr<TcpConnection>&)> cb) {
         closeCallback_ = std::move(cb);
     }
 

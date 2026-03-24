@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <functional>
 #include <string>
+#include <memory>
 
 namespace MyServer {
 
@@ -28,10 +29,10 @@ private:
     Acceptor* acceptor_;    ///< 迎宾员 (专门接收新连接)
     
     ///< 账本：记录当前餐厅里所有的客人。Key 是 fd，Value 是对应的 TcpConnection 对象
-    std::unordered_map<int, TcpConnection*> connections_; 
+    std::unordered_map<int, std::shared_ptr<TcpConnection>> connections_; 
 
     ///< 业务逻辑回调：让外部开发者决定，收到消息后到底该干嘛？(比如做回声、做HTTP解析等)
-    std::function<void(TcpConnection*, const std::string&)> onMessageCallback_;
+    std::function<void(const std::shared_ptr<TcpConnection>&, const std::string&)> onMessageCallback_;
 
 public:
     /**
@@ -63,15 +64,15 @@ public:
     /**
      * @brief 客人离开或连接异常时，触发此函数
      * @details 核心职责是：在底层抛出销毁请求时，从账本(connections_)中将该连接擦除，并销毁该 TcpConnection 对象的堆内存。
-     * @param fd 需要销毁的客户端文件描述符
+     * @param conn 需要销毁的客户端连接智能指针
      */
-    void removeConnection(int fd);
+    void removeConnection(const std::shared_ptr<TcpConnection>& conn);
 
     /**
      * @brief 业务逻辑暴露接口：注册当收到客户端消息时触发的回调
-     * @param cb 回调签名，提供对应的连接对象指针 `TcpConnection*` 以及解码出的纯文本信息 `const std::string&`
+     * @param cb 回调签名，提供对应的连接智能指针 `std::shared_ptr<TcpConnection>` 以及解码出的纯文本信息 `const std::string&`
      */
-    void setOnMessageCallback(std::function<void(TcpConnection*, const std::string&)> cb) {
+    void setOnMessageCallback(std::function<void(const std::shared_ptr<TcpConnection>&, const std::string&)> cb) {
         onMessageCallback_ = std::move(cb);
     }
 };

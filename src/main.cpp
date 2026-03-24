@@ -23,7 +23,7 @@ int main() {
     ThreadPool pool(4); // 创建一个包含4个线程的线程池
 
     // 核心业务逻辑：收到消息怎么办？
-    server.setOnMessageCallback([&pool](TcpConnection* conn, const std::string& msg) {
+    server.setOnMessageCallback([&pool](const std::shared_ptr<TcpConnection>& conn, const std::string& msg) {
         // 1. 主线程收到了完整消息，直接扔给后厨 (ThreadPool)
         pool.enqueue([conn, msg]() {
             // --- 这里是工作线程 (后厨) 在运行 ---

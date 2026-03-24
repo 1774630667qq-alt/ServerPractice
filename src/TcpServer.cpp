@@ -20,9 +20,7 @@ TcpServer::TcpServer(EventLoop* loop, int port)
 TcpServer::~TcpServer() {
     delete acceptor_;
     // 清理所有尚未关闭的连接
-    for (auto& pair : connections_) {
-        delete pair.second;
-    }
+    connections_.clear();
 }
 
 void TcpServer::start() {
@@ -33,7 +31,7 @@ void TcpServer::start() {
 void TcpServer::newConnection(int fd) {
     // 【任务 3】：安排客人入座
     // 1. 创建一个新的 TcpConnection 对象
-    TcpConnection* conn = new TcpConnection(loop_, fd);
+    std::shared_ptr<TcpConnection> conn = std::make_shared<TcpConnection>(loop_, fd);
     
     // 2. 告诉客人：如果你收到消息，请立刻执行我的 onMessageCallback_！
     conn->setMessageCallback(onMessageCallback_);
@@ -48,12 +46,11 @@ void TcpServer::newConnection(int fd) {
     std::cout << "TcpServer: 新连接加入账本，当前连接数=" << connections_.size() << std::endl;
 }
 
-void TcpServer::removeConnection(int fd) {
+void TcpServer::removeConnection(const std::shared_ptr<TcpConnection>& conn) {
     // 【任务 4】：客人走了，划掉账本
-    if (connections_.find(fd) != connections_.end()) {
-        TcpConnection* conn = connections_[fd];
-        connections_.erase(fd); // 从账本中移除
-        delete conn;            // 销毁对象，释放内存 (内部会 close(fd))
+    if (connections_.find(conn->getFd()) != connections_.end()) {
+        connections_.erase(conn->getFd()); // 从账本中移除
+        // 对象会自动引用计数减一，如果是最后一个引用，则会自动销毁内存和 close(fd)
         std::cout << "TcpServer: 连接已从账本移除，当前连接数=" << connections_.size() << std::endl;
     }
 }
