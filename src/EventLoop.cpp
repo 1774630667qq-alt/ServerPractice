@@ -116,10 +116,9 @@ namespace MyServer
                 channel->setRevents(activeEvents_[i].events); // 把实际发生的事件告诉 Channel
                 channel->handleEvent(); // 让 Channel 自己去处理事件
             }
+            // 在退出循环前，执行所有出餐台上的任务，确保没有遗漏
+            doPendingFunctors();
         }
-
-        // 在退出循环前，执行所有出餐台上的任务，确保没有遗漏
-        doPendingFunctors();
     }
 
     void EventLoop::updateChannel(Channel* channel) {

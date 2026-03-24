@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 15:35:21
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-24 22:03:31
+ * @LastEditTime: 2026-03-24 22:40:49
  * @FilePath: /ServerPractice/src/main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -28,7 +28,7 @@ int main() {
         pool.enqueue([conn, msg]() {
             // --- 这里是工作线程 (后厨) 在运行 ---
             std::cout << "工作线程开始处理耗时任务..." << std::endl;
-            // sleep(3); // 模拟耗时 3 秒的数据库查询或人脸识别
+            sleep(3); // 模拟耗时 3 秒的数据库查询或人脸识别
             std::string result = "Processed: " + msg;
             
             // 2. 算完了！但是绝对不能直接 conn->send(result) ！！！
