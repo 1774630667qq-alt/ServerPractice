@@ -73,6 +73,27 @@ public:
         // 没找到 \n，说明是半包，什么都不返回，继续等后续数据
         return ""; 
     }
+
+    /**
+     * @brief 专门用于提取 HTTP 头部的解析器
+     * @return 如果找到了 \r\n\r\n，就返回整个 HTTP 头部字符串；否则返回空字符串继续等待。
+     */
+    std::string extractHttpHeaders() {
+        // 在缓冲区中查找 HTTP 头部的结束标志 "\r\n\r\n"
+        size_t pos = buf_.find("\r\n\r\n");
+        
+        if (pos != std::string::npos) {
+            // 找到了！提取出包含 \r\n\r\n 在内的完整 HTTP 头部
+            size_t header_len = pos + 4; // "\r\n\r\n" 占用 4 个字节
+            std::string header = buf_.substr(0, header_len); 
+            // 把提取走的头部从水池里删掉
+            buf_.erase(0, header_len); 
+            return header;
+        }
+        
+        // 没找到 \r\n\r\n，说明 HTTP 请求还没收全，什么都不返回
+        return ""; 
+    }
 };
 
 } // namespace MyServer

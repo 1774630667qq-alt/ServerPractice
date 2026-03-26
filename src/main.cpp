@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 15:35:21
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-24 22:40:49
+ * @LastEditTime: 2026-03-26 15:03:08
  * @FilePath: /ServerPractice/src/main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -13,11 +13,23 @@
 #include "ThreadPool.hpp"
 #include <functional>
 #include <unistd.h>
+#include <signal.h>
 
 
 using namespace MyServer;
 
 int main() {
+    /**
+     * @brief 设置信号处理方式 (系统调用)
+     * @param signum 要处理的信号 (此处为 SIGPIPE)
+     * @param handler 信号处理函数或宏：
+     *                - SIG_IGN: 忽略此信号。当客户端突然断开连接，而服务器仍尝试向其发送数据时，会产生 SIGPIPE 信号。
+     *                           默认情况下，该信号会终止进程。设置为 SIG_IGN 可以防止服务器因此崩溃。
+     *                - SIG_DFL: 使用默认处理方式。
+     *                - 自定义函数指针: 调用指定的函数来处理信号。
+     * @return 成功返回之前的信号处理函数指针，失败返回 SIG_ERR。
+     */
+    signal(SIGPIPE, SIG_IGN);
     EventLoop loop;
     TcpServer server(&loop, 8080);
     ThreadPool pool(4); // 创建一个包含4个线程的线程池
@@ -36,9 +48,14 @@ int main() {
             EventLoop* loop = conn->getLoop(); // 你需要在 TcpConnection 里暴露出 loop_ 指针
             
             loop->queueInLoop([conn, result]() {
-                // --- 这里又回到了主线程在运行！---
-                // 现在在主线程调用 send，绝对线程安全！
-                conn->send(result); 
+                std::string http_response = 
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                "Content-Length: 64\r\n"
+                "\r\n"
+                "<h1 style='color: red;'>Hello from My C++ Reactor Server!</h1>";
+
+                conn->send(http_response);
             });
         });
     });
