@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 17:07:48
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-26 17:38:23
+ * @LastEditTime: 2026-03-26 19:20:42
  * @FilePath: /ServerPractice/include/HttpServer.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -33,15 +33,6 @@ private:
     /**
      * @brief 底层 TCP 收到消息时的中转站
      * @details 这里就是串联你所有知识点的地方！
-     * * @note 【你的实现思路】
-     * 1. 它是 TcpServer 的 onMessageCallback。
-     * 2. 它会被扔进 pool_->enqueue() 里面执行（进入工作线程）。
-     * 3. 在工作线程里，创建一个 HttpRequest 对象，调用 HttpParser::parse(msg, &request) 解析。
-     * 4. 解析如果失败（比如返回 false），直接返回 400 Bad Request 给客户端。
-     * 5. 如果成功，创建一个 HttpResponse response; 对象。
-     * 6. ⭐ 呼叫业务层的代码：httpCallback_(request, response); （让业务层去填 response 的内容）。
-     * 7. 业务层填完后，调用 response.assemble() 序列化成纯字符串。
-     * 8. 最后，通过 loop->queueInLoop(...) 安全地调用 conn->send() 发送给客户端！
      */
     void onMessage(std::shared_ptr<TcpConnection> conn, const std::string& msg);
 

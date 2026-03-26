@@ -2,20 +2,21 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 17:08:52
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-26 17:36:13
+ * @LastEditTime: 2026-03-26 19:33:41
  * @FilePath: /ServerPractice/src/HttpParser.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #include "HttpParser.hpp"
+#include "iostream"
 
 namespace MyServer {
     bool HttpParser::parseHeaders(const std::string& headers_str, HttpRequest* request) {
         int index = 0;
-        while (index < headers_str.size()) {
+        while (headers_str.substr(index, 2) != "\r\n") { // 遇到空行就结束
             // 找到下一行的结尾
             int next_line_pos = headers_str.find("\r\n", index);
             if (next_line_pos == std::string::npos) {
-                // 没有找到下一行，说明格式错误
+                std::cerr << "解析请求头失败：没有找到行结束符" << std::endl;
                 return false;
             }
 
@@ -26,7 +27,7 @@ namespace MyServer {
             // 找到冒号的位置
             int colon_pos = line.find(':');
             if (colon_pos == std::string::npos) {
-                // 没有找到冒号，说明格式错误
+                std::cerr << "解析请求头失败：没有找到冒号分隔符" << std::endl;
                 return false;
             }
 
@@ -45,12 +46,14 @@ namespace MyServer {
             // 添加到请求对象中
             request->addHeader(key, value);
         }
+        return true;
     }
 
     bool HttpParser::parseRequestLine(const std::string& line, HttpRequest* request) {
         // 找到第一个空格
         int first_space_pos = line.find(' ');
         if (first_space_pos == std::string::npos) {
+            std::cerr << "解析请求行失败：没有找到第一个空格" << std::endl;
             return false; // 没有第一个空格，格式错误
         }
         std::string method = line.substr(0, first_space_pos);
@@ -58,6 +61,7 @@ namespace MyServer {
         // 找到第二个空格
         int second_space_pos = line.find(' ', first_space_pos + 1);
         if (second_space_pos == std::string::npos) {
+            std::cerr << "解析请求行失败：没有找到第二个空格" << std::endl;
             return false; // 没有第二个空格，格式错误
         }
         std::string path = line.substr(first_space_pos + 1, second_space_pos - first_space_pos - 1);
