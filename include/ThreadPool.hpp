@@ -50,7 +50,10 @@ namespace MyServer {
             }
         }
 
-        // 添加新任务到线程池
+        /**
+         * @brief 向线程池中添加新的异步任务
+         * @param task 需要在工作线程中执行的任务 (通常为 Lambda 表达式或 std::bind 绑定的函数)
+         */
         void enqueue(std::function<void()> task) {
             {
                 std::unique_lock<std::mutex> lock(queue_mutex);

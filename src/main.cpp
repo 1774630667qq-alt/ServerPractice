@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 15:35:21
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-26 16:53:18
+ * @LastEditTime: 2026-03-26 19:01:11
  * @FilePath: /ServerPractice/src/main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -15,6 +15,9 @@
 #include <unistd.h>
 #include <signal.h>
 #include "HttpResponse.hpp"
+#include "HttpServer.hpp"
+#include "HttpRequest.hpp"
+#include "HttpParser.hpp"
 
 using namespace MyServer;
 
@@ -31,34 +34,34 @@ int main() {
      */
     signal(SIGPIPE, SIG_IGN);
     EventLoop loop;
-    TcpServer server(&loop, 8080);
-    ThreadPool pool(4); // 创建一个包含4个线程的线程池
+    ThreadPool pool(4);
+    
+    // 1. 创建你的 Web 服务器
+    HttpServer http_server(&loop, 8080, &pool);
 
-    // 核心业务逻辑：收到消息怎么办？
-    server.setOnMessageCallback([&pool](const std::shared_ptr<TcpConnection>& conn, const std::string& msg) {
-        // 1. 主线程收到了完整消息，直接扔给后厨 (ThreadPool)
-        pool.enqueue([conn, msg]() {
-            // --- 这里是工作线程 (后厨) 在运行 ---
-            std::cout << "工作线程开始处理耗时任务..." << std::endl;
-            // sleep(3); // 模拟耗时 3 秒的数据库查询或人脸识别
-            std::string result = "Processed: " + msg;
-            
-            // 2. 算完了！但是绝对不能直接 conn->send(result) ！！！
-            // 必须打包成任务，通过 EventLoop 丢回给主线程！
-            HttpResponse response;
-            response.addHeader("Content-Type", "text/html; charset=utf-8");
-            response.setBody("<h1 style='color: blue;'>Hello from OOP HTTP Response!</h1>");
-            
-            // 自动序列化并发回给大堂经理
-            EventLoop* loop = conn->getLoop(); 
-            loop->queueInLoop([conn, response]() {
-                conn->send(response.assemble()); // 直接把 assemble() 出来的纯字符串发走！
-            });
-        });
+    // 2. 业务层专心写路由逻辑，再也不用管 TCP、线程和 fd 了！
+    http_server.setHttpCallback([](const HttpRequest& req, HttpResponse& res) {
+        std::cout << "收到请求，路径是: " << req.getPath() << std::endl;
+
+        if (req.getPath() == "/") {
+            res.setStatusCode(200, "OK");
+            res.addHeader("Content-Type", "text/html; charset=utf-8");
+            res.setBody("<h1>欢迎来到主页！</h1><p>你的 User-Agent 是: " + req.getHeader("User-Agent") + "</p>");
+        } 
+        else if (req.getPath() == "/login") {
+            res.setStatusCode(200, "OK");
+            res.addHeader("Content-Type", "text/html; charset=utf-8");
+            res.setBody("<h1>请登录</h1>");
+        } 
+        else {
+            res.setStatusCode(404, "Not Found");
+            res.addHeader("Content-Type", "text/html; charset=utf-8");
+            res.setBody("<h1 style='color:red;'>404 找不到页面</h1>");
+        }
     });
 
-    server.start(); // 启动迎宾员
-    loop.loop();    // 启动大堂经理 (死循环)
-
+    std::cout << "Web 框架启动，监听 8080..." << std::endl;
+    http_server.start();
+    loop.loop();
     return 0;
 }

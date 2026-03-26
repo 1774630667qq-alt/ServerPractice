@@ -69,17 +69,20 @@ public:
     void setCloseCallback(std::function<void()> cb) { closeCallback_ = std::move(cb); }
 
     /**
-     * 
+     * @brief 注册写事件回调函数 (通常在底层 TCP 发送缓冲区有空位时被触发)
+     * @param cb 外部传入的 Lambda 表达式或函数指针
      */
     void setWriteCallback(std::function<void()> cb) { writeCallback_ = std::move(cb); }
 
     /**
-     * 
+     * @brief 开启对“可写事件”的监听
+     * @details 会向事件掩码中添加 EPOLLOUT 标志，并更新到底层 epoll 实例中
      */
     void enableWriting();
 
     /**
-     * 
+     * @brief 取消对“可写事件”的监听
+     * @details 从事件掩码中移除 EPOLLOUT 标志。当数据全部发送完毕后必须调用此方法，防止 CPU 疯狂空转
      */
     void disableWriting();
     
