@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 15:35:21
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-26 15:03:08
+ * @LastEditTime: 2026-03-26 16:53:18
  * @FilePath: /ServerPractice/src/main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -14,7 +14,7 @@
 #include <functional>
 #include <unistd.h>
 #include <signal.h>
-
+#include "HttpResponse.hpp"
 
 using namespace MyServer;
 
@@ -40,22 +40,19 @@ int main() {
         pool.enqueue([conn, msg]() {
             // --- 这里是工作线程 (后厨) 在运行 ---
             std::cout << "工作线程开始处理耗时任务..." << std::endl;
-            sleep(3); // 模拟耗时 3 秒的数据库查询或人脸识别
+            // sleep(3); // 模拟耗时 3 秒的数据库查询或人脸识别
             std::string result = "Processed: " + msg;
             
             // 2. 算完了！但是绝对不能直接 conn->send(result) ！！！
             // 必须打包成任务，通过 EventLoop 丢回给主线程！
-            EventLoop* loop = conn->getLoop(); // 你需要在 TcpConnection 里暴露出 loop_ 指针
+            HttpResponse response;
+            response.addHeader("Content-Type", "text/html; charset=utf-8");
+            response.setBody("<h1 style='color: blue;'>Hello from OOP HTTP Response!</h1>");
             
-            loop->queueInLoop([conn, result]() {
-                std::string http_response = 
-                "HTTP/1.1 200 OK\r\n"
-                "Content-Type: text/html; charset=utf-8\r\n"
-                "Content-Length: 64\r\n"
-                "\r\n"
-                "<h1 style='color: red;'>Hello from My C++ Reactor Server!</h1>";
-
-                conn->send(http_response);
+            // 自动序列化并发回给大堂经理
+            EventLoop* loop = conn->getLoop(); 
+            loop->queueInLoop([conn, response]() {
+                conn->send(response.assemble()); // 直接把 assemble() 出来的纯字符串发走！
             });
         });
     });
