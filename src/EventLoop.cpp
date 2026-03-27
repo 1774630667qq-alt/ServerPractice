@@ -1,6 +1,6 @@
 #include "EventLoop.hpp"
 #include "Channel.hpp"
-#include <iostream>
+#include "Logger.hpp"
 #include <sys/epoll.h>
 #include <sys/eventfd.h> // 提供 eventfd 函数
 #include <unistd.h> // 提供 close 函数
@@ -23,8 +23,7 @@ namespace MyServer
          */
         int evtfd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
         if (evtfd < 0) {
-            std::cerr << "Failed in eventfd" << std::endl;
-            abort();
+            LOG_FATAL << "Failed in eventfd";
         }
         return evtfd;
     }
@@ -33,8 +32,7 @@ namespace MyServer
         // 创建 epoll 实例
         epfd_ = epoll_create1(0);
         if (epfd_ == -1) {
-            std::cerr << "Epoll 创建失败!" << std::endl;
-            exit(EXIT_FAILURE);
+            LOG_FATAL << "Epoll 创建失败!";
         }
 
         // 创建 eventfd 用于跨线程唤醒
@@ -65,7 +63,7 @@ namespace MyServer
          */
         ssize_t n = ::write(wakeupFd_, &one, sizeof(one));
         if (n != sizeof(one)) {
-            std::cerr << "EventLoop 唤醒失败!" << std::endl;
+            LOG_ERROR << "EventLoop 唤醒失败!";
         }
     }
 
@@ -80,7 +78,7 @@ namespace MyServer
          */
         ssize_t n = ::read(wakeupFd_, &one, sizeof(one));
         if (n != sizeof(one)) {
-            std::cerr << "EventLoop 处理唤醒事件失败!" << std::endl;
+            LOG_ERROR << "EventLoop 处理唤醒事件失败!";
         }
     }
 
@@ -107,7 +105,7 @@ namespace MyServer
         while (!quit_) {
             int nfds = epoll_wait(epfd_, activeEvents_.data(), static_cast<int>(activeEvents_.size()), -1);
             if (nfds == -1) {
-                std::cerr << "Epoll 等待事件失败!" << std::endl;
+                LOG_ERROR << "Epoll 等待事件失败!";
                 continue; // 出错了，但我们不想退出整个服务器，所以继续循环
             }
 
@@ -134,10 +132,10 @@ namespace MyServer
             if (errno == ENOENT) {
                 // 如果是因为这个 fd 还没有被注册过，那么就添加它
                 if (epoll_ctl(epfd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
-                    std::cerr << "Epoll 添加 Channel 失败!" << std::endl;
+                    LOG_ERROR << "Epoll 添加 Channel 失败!";
                 }
             } else {
-                std::cerr << "Epoll 修改 Channel 失败!" << std::endl;
+                LOG_ERROR << "Epoll 修改 Channel 失败!";
             }
         }
     }

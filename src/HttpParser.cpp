@@ -7,7 +7,7 @@
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #include "HttpParser.hpp"
-#include "iostream"
+#include "Logger.hpp"
 
 namespace MyServer {
     bool HttpParser::parseHeaders(const std::string& headers_str, HttpRequest* request) {
@@ -16,7 +16,7 @@ namespace MyServer {
             // 找到下一行的结尾
             size_t next_line_pos = headers_str.find("\r\n", index);
             if (next_line_pos == std::string::npos) {
-                std::cerr << "解析请求头失败：没有找到行结束符" << std::endl;
+                LOG_WARNING << "解析请求头失败：没有找到行结束符";
                 return false;
             }
 
@@ -27,7 +27,7 @@ namespace MyServer {
             // 找到冒号的位置
             size_t colon_pos = line.find(':');
             if (colon_pos == std::string::npos) {
-                std::cerr << "解析请求头失败：没有找到冒号分隔符" << std::endl;
+                LOG_WARNING << "解析请求头失败：没有找到冒号分隔符";
                 return false;
             }
 
@@ -53,7 +53,7 @@ namespace MyServer {
         // 找到第一个空格
         size_t first_space_pos = line.find(' ');
         if (first_space_pos == std::string::npos) {
-            std::cerr << "解析请求行失败：没有找到第一个空格" << std::endl;
+            LOG_WARNING << "解析请求行失败：没有找到第一个空格";
             return false; // 没有第一个空格，格式错误
         }
         std::string method = line.substr(0, first_space_pos);
@@ -61,7 +61,7 @@ namespace MyServer {
         // 找到第二个空格
         size_t second_space_pos = line.find(' ', first_space_pos + 1);
         if (second_space_pos == std::string::npos) {
-            std::cerr << "解析请求行失败：没有找到第二个空格" << std::endl;
+            LOG_WARNING << "解析请求行失败：没有找到第二个空格";
             return false; // 没有第二个空格，格式错误
         }
         std::string path = line.substr(first_space_pos + 1, second_space_pos - first_space_pos - 1);

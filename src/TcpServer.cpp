@@ -1,8 +1,8 @@
-#include "../include/TcpServer.hpp"
-#include "../include/EventLoop.hpp"
-#include "../include/Accept.hpp"
-#include "../include/TcpConnection.hpp"
-#include <iostream>
+#include "TcpServer.hpp"
+#include "EventLoop.hpp"
+#include "Accept.hpp"
+#include "Logger.hpp"
+#include "TcpConnection.hpp"
 
 namespace MyServer {
 
@@ -43,7 +43,7 @@ void TcpServer::newConnection(int fd) {
     
     // 4. 把这个新客人登记到账本上
     connections_[fd] = conn;
-    std::cout << "TcpServer: 新连接加入账本，当前连接数=" << connections_.size() << std::endl;
+    LOG_INFO << "TcpServer: 新连接加入账本，当前连接数=" << connections_.size();
 }
 
 void TcpServer::removeConnection(const std::shared_ptr<TcpConnection>& conn) {
@@ -51,7 +51,7 @@ void TcpServer::removeConnection(const std::shared_ptr<TcpConnection>& conn) {
     if (connections_.find(conn->getFd()) != connections_.end()) {
         connections_.erase(conn->getFd()); // 从账本中移除
         // 对象会自动引用计数减一，如果是最后一个引用，则会自动销毁内存和 close(fd)
-        std::cout << "TcpServer: 连接已从账本移除，当前连接数=" << connections_.size() << std::endl;
+        LOG_INFO << "TcpServer: 连接已从账本移除，当前连接数=" << connections_.size();
     }
 }
 

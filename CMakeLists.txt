@@ -3,6 +3,9 @@
 # @param <min> (如 3.10) 指定所需的最低 CMake 版本号。如果当前编译环境的 CMake 版本低于此值，将报错并停止配置。
 cmake_minimum_required(VERSION 3.10)
 
+# 让编译器在展开 __FILE__ 时，自动把当前项目的绝对路径前缀替换为空字符串！
+add_compile_options(-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=)
+
 # @brief 定义项目名称及基本属性。
 # @param <PROJECT-NAME> (如 ServerPractice) 项目的名称。调用此命令后，CMake 会隐式生成 PROJECT_NAME 等相关内置变量供后续使用。
 project(ServerPractice)

@@ -12,6 +12,9 @@
 
 namespace MyServer {
 
+// 全局日志初始化函数 (必须在程序开始时调用一次)
+void initGlobalLogger(const std::string& basename);
+
 // 1. 定义日志级别
 enum class LogLevel {
     INFO,

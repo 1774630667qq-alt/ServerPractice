@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 15:35:21
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-26 19:01:11
+ * @LastEditTime: 2026-03-27 18:29:25
  * @FilePath: /ServerPractice/src/main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -18,6 +18,7 @@
 #include "HttpServer.hpp"
 #include "HttpRequest.hpp"
 #include "HttpParser.hpp"
+#include "Logger.hpp"
 
 using namespace MyServer;
 
@@ -33,6 +34,7 @@ int main() {
      * @return 成功返回之前的信号处理函数指针，失败返回 SIG_ERR。
      */
     signal(SIGPIPE, SIG_IGN);
+    MyServer::initGlobalLogger("MyServerLog"); // 初始化全局日志系统，日志文件前缀为 "MyServerLog"
     EventLoop loop;
     ThreadPool pool(4);
     
@@ -41,7 +43,7 @@ int main() {
 
     // 2. 业务层专心写路由逻辑，再也不用管 TCP、线程和 fd 了！
     http_server.setHttpCallback([](const HttpRequest& req, HttpResponse& res) {
-        std::cout << "收到请求，路径是: " << req.getPath() << std::endl;
+        LOG_INFO << "收到请求，路径是: " << req.getPath();
 
         if (req.getPath() == "/") {
             res.setStatusCode(200, "OK");
@@ -60,7 +62,7 @@ int main() {
         }
     });
 
-    std::cout << "Web 框架启动，监听 8080..." << std::endl;
+    LOG_INFO << "Web 框架启动，监听 8080...";
     http_server.start();
     loop.loop();
     return 0;

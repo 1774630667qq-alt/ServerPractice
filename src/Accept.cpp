@@ -8,12 +8,12 @@
  */
 #include "Channel.hpp"
 #include "EventLoop.hpp"
+#include "Logger.hpp"
 #include "Accept.hpp"
 #include <sys/socket.h> // 提供 socket 函数及数据结构
 #include <netinet/in.h> // 提供 IPv4 的 sockaddr_in 结构体
 #include <arpa/inet.h>  // 提供 IP 地址转换函数
 #include <unistd.h>     // 提供 close 函数
-#include <iostream>
 #include <cstring>      // 提供 memset
 #include <fcntl.h>      // 提供 fcntl
 
@@ -22,10 +22,9 @@ namespace MyServer {
         // --- 1. 创建监听套接字 ---
         listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
         if (listen_fd_ == -1) {
-            std::cerr << "Socket 创建失败!" << std::endl;
-            exit(EXIT_FAILURE);
+            LOG_FATAL << "Socket 创建失败!";
         }
-        std::cout << "Socket 创建成功，fd: " << listen_fd_ << std::endl;
+        LOG_INFO << "Socket 创建成功，fd: " << listen_fd_;
 
         // 开启端口复用
         int opt = 1;
@@ -38,9 +37,8 @@ namespace MyServer {
         server_addr.sin_port = htons(port);
         server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
         if (bind(listen_fd_, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
-            std::cerr << "Bind 失败!" << std::endl;
+            LOG_FATAL << "Bind 失败!";
             close(listen_fd_);
-            exit(EXIT_FAILURE);
         }
 
         // 设置监听套接字为非阻塞模式
@@ -59,11 +57,10 @@ namespace MyServer {
 
     void Acceptor::listen() {
         if (::listen(listen_fd_, 128) == -1) {
-            std::cerr << "Listen 失败!" << std::endl;
+            LOG_FATAL << "Listen 失败!";
             close(listen_fd_);
-            exit(EXIT_FAILURE);
         }
-        std::cout << "服务器启动，正在监听 " << port_ << " 端口..." << std::endl;
+        LOG_INFO << "服务器启动，正在监听 " << port_ << " 端口...";
         acceptChannel_->enableReading();
     }
 
@@ -77,7 +74,7 @@ namespace MyServer {
                     // 没有更多的连接了，退出循环
                     break;
                 } else {
-                    std::cerr << "Accept 失败!" << std::endl;
+                    LOG_ERROR << "Accept 失败!";
                     break;
                 }
             }
@@ -87,7 +84,7 @@ namespace MyServer {
 
             char ip_str[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &client_addr.sin_addr, ip_str, sizeof(ip_str));
-            std::cout << "新客户端连接: " << ip_str << ":" << ntohs(client_addr.sin_port) << ", fd: " << client_fd << std::endl;
+            LOG_INFO << "新客户端连接: " << ip_str << ":" << ntohs(client_addr.sin_port) << ", fd: " << client_fd;
 
             if (newConnectionCallback_) {
                 newConnectionCallback_(client_fd);

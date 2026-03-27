@@ -6,10 +6,10 @@
  * @FilePath: /ServerPractice/src/TcpConnection.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
-#include <iostream>
 #include "TcpConnection.hpp"
 #include "EventLoop.hpp"
 #include "Channel.hpp"
+#include "Logger.hpp"
 #include "Buffer.hpp"
 #include <sys/socket.h>
 #include <unistd.h>
@@ -51,7 +51,7 @@ namespace MyServer {
                     // 没有更多数据可读了，退出循环
                     break;
                 } else {
-                    std::cerr << "Recv 失败!" << std::endl;
+                    LOG_ERROR << "Recv 失败!";
                     // 将回调拷贝到栈上，防止对象自杀导致段错误
                     auto cb = closeCallback_;
                     if (cb) {
@@ -61,7 +61,7 @@ namespace MyServer {
                 }
             } else {
                 // bytes_read == 0，客户端断开连接
-                std::cout << "客户端 fd " << active_fd << " 断开连接" << std::endl;
+                LOG_INFO << "客户端 fd " << active_fd << " 断开连接";
                 // 同理，拷贝到栈上安全执行
                 auto cb = closeCallback_;
                 if (cb) {
@@ -110,7 +110,7 @@ namespace MyServer {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 bytes_sent = 0; // 缓冲区满了，一个字节都没发出去，正常情况
             } else {
-                std::cerr << "Send 失败! errno=" << errno << std::endl;
+                LOG_ERROR << "Send 失败! errno=" << errno;
                 auto cb = closeCallback_;
             if (cb) cb(guard);
                 return;
@@ -144,7 +144,7 @@ namespace MyServer {
                 writeBuffer_.retrieve(bytes_sent); 
             } else if (bytes_sent == -1) {
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                    std::cerr << "handleWrite 底层发送失败!" << std::endl;
+                    LOG_ERROR << "handleWrite 底层发送失败!";
                     auto cb = closeCallback_;
                 if (cb) cb(guard);
                     return;
