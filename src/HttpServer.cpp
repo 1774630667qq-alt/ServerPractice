@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 17:41:20
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-26 19:22:58
+ * @LastEditTime: 2026-03-26 19:48:12
  * @FilePath: /ServerPractice/src/HttpServer.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -21,8 +21,9 @@ namespace MyServer {
     }
 
     void HttpServer::onMessage(std::shared_ptr<TcpConnection> conn, const std::string& msg) {
+        auto cb = httpCallback_; // 先把 httpCallback_ 拷贝到局部变量，避免后续被修改导致竞态条件
         // 1. 将 onMessage 的处理逻辑扔进线程池，让工作线程来执行
-        pool_->enqueue([this, conn, msg] {
+        pool_->enqueue([cb, conn, msg] {
             // 2. 在工作线程里，创建一个 HttpRequest 对象，调用 HttpParser::parse(msg, &request) 解析。
             HttpRequest request;
             HttpResponse response;
@@ -35,8 +36,8 @@ namespace MyServer {
                 response.setBody("<html><head><title>400 Bad Request</title></head><body><h1>400 Bad Request</h1><p>Your browser sent a request that this server could not understand.</p></body></html>");
             } else {
                 // 4. 解析成功，呼叫业务层的代码：httpCallback_(request, response); （让业务层去填 response 的内容）。
-                if (httpCallback_) {
-                    httpCallback_(request, response);
+                if (cb) {
+                    cb(request, response);
                 }
             }
 
