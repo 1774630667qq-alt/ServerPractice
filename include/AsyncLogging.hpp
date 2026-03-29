@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-27 16:29:50
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-27 16:30:08
+ * @LastEditTime: 2026-03-28 16:15:51
  * @FilePath: /ServerPractice/include/AsyncLogging.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -65,9 +65,6 @@ public:
         }
     }
 
-    // ==========================================================
-    // ⭐ 你的挑战：前台写日志接口
-    // ==========================================================
     /**
      * @brief 供前端业务线程调用的写日志接口
      * @param logline 单条完整日志的首地址 (来自 LogStream)

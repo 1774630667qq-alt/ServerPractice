@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 15:29:42
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-24 17:31:52
+ * @LastEditTime: 2026-03-29 22:42:44
  * @FilePath: /ServerPractice/include/TcpConnection.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -11,6 +11,7 @@
 #include <string>
 #include <memory>
 #include "Buffer.hpp"
+#include "Timer.hpp"
 
 namespace MyServer {
 
@@ -30,6 +31,7 @@ private:
     Channel* channel_;      ///< 属于这个 fd 的专属通信管道 (服务员)
     Buffer buffer_;         ///< 读数据的缓冲区
     Buffer writeBuffer_;    ///< 写数据的缓冲区
+    std::shared_ptr<Timer> keepAliveTimer_; ///< 专属秒表：如果长时间没重置，它就会引爆！
 
     // --- 给上层大老板 (TcpServer) 留的汇报接口 ---
     
@@ -39,6 +41,10 @@ private:
     ///< 当客人断开连接时，触发此回调。参数是当前连接的智能指针
     std::function<void(const std::shared_ptr<TcpConnection>&)> closeCallback_;
 
+    /**
+     * @brief 定时器引爆时执行的踢人函数
+     */
+    void handleTimeout();
 public:
     /**
      * @brief 构造函数：接管客户端文件描述符，并初始化其专属 Channel
@@ -99,6 +105,11 @@ public:
      * @return 指向所在的 EventLoop 对象的指针
      */
     EventLoop* getLoop() { return loop_; };
+
+    /**
+     * @brief 为当前连接续命 (重置秒表)
+     */
+    void extendLife();
 };
 
 } // namespace MyServer

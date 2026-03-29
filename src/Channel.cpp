@@ -56,4 +56,9 @@ namespace MyServer {
         events_ |= EPOLLIN | EPOLLET; // 添加边缘触发(ET)标志
         loop_->updateChannel(this);
     }
+
+    void Channel::disableAll() {
+        events_ = 0;
+        loop_->updateChannel(this);
+    }
 }

@@ -1,3 +1,11 @@
+/*
+ * @Author: Zhang YuHua 1774630667@qq.com
+ * @Date: 2026-03-20 16:06:42
+ * @LastEditors: Zhang YuHua 1774630667@qq.com
+ * @LastEditTime: 2026-03-29 22:57:01
+ * @FilePath: /ServerPractice/src/TcpServer.cpp
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 #include "TcpServer.hpp"
 #include "EventLoop.hpp"
 #include "Accept.hpp"
@@ -8,7 +16,6 @@ namespace MyServer {
 
 TcpServer::TcpServer(EventLoop* loop, int port)
     : loop_(loop), acceptor_(nullptr) {
-    // 【任务 1】：招募迎宾员
     acceptor_ = new Acceptor(loop_, port);
     
     // 告诉迎宾员：接到新客人后，把 fd 交给我的 newConnection 方法！
@@ -24,12 +31,10 @@ TcpServer::~TcpServer() {
 }
 
 void TcpServer::start() {
-    // 【任务 2】：让迎宾员开始工作
     acceptor_->listen();
 }
 
 void TcpServer::newConnection(int fd) {
-    // 【任务 3】：安排客人入座
     // 1. 创建一个新的 TcpConnection 对象
     std::shared_ptr<TcpConnection> conn = std::make_shared<TcpConnection>(loop_, fd);
     
@@ -40,6 +45,9 @@ void TcpServer::newConnection(int fd) {
     conn->setCloseCallback(
         std::bind(&TcpServer::removeConnection, this, std::placeholders::_1)
     );
+
+    // 开启连接的心跳监测
+    conn->extendLife();
     
     // 4. 把这个新客人登记到账本上
     connections_[fd] = conn;

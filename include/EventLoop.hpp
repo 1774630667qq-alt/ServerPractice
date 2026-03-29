@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-19 15:20:10
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-24 16:55:41
+ * @LastEditTime: 2026-03-29 22:34:11
  * @FilePath: /ServerPractice/include/EventLoop.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -10,11 +10,13 @@
 #include <vector>
 #include <functional>
 #include <mutex>
+#include "Timer.hpp"
 #include <sys/epoll.h>
 
 namespace MyServer {
 
 class Channel; // 前向声明
+class TimerQueue; // 前向声明
 
 /**
  * @brief 事件循环类 (Reactor 模式的发动机)
@@ -34,6 +36,7 @@ private:
     // --- 新增：多线程通信组件 ---
     int wakeupFd_;                          ///< 跨线程唤醒的呼叫铃 (eventfd)
     Channel* wakeupChannel_;                ///< 封装呼叫铃的 Channel
+    TimerQueue* timerQueue_;                ///< 定时器队列 (管理所有定时器)
 
     std::mutex mutex_;                      ///< 保护任务队列的互斥锁
     std::vector<std::function<void()>> pendingFunctors_; ///< 出餐台 (任务队列)
@@ -82,6 +85,11 @@ public:
      * @brief 唤醒沉睡在 epoll_wait 的主线程
      */
     void wakeup();
+
+    /**
+     * @brief 在指定毫秒数后，执行该段段代码！
+     */
+    std::shared_ptr<Timer> runAfter(int timeout_ms, TimeoutCallback cb);
 
     /**
      * @brief 把任务扔进出餐台，并敲响呼叫铃

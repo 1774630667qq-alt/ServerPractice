@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 15:29:51
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-26 16:28:34
+ * @LastEditTime: 2026-03-29 22:55:43
  * @FilePath: /ServerPractice/src/TcpConnection.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -46,6 +46,8 @@ namespace MyServer {
             int bytes_read = recv(active_fd, buf, sizeof(buf), 0);
             if (bytes_read > 0) {
                 buffer_.append(buf, bytes_read); // 把读到的数据追加到缓冲区
+                // 每次读到数据都要续命一下，重置秒表
+                extendLife();
             } else if (bytes_read == -1){
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                     // 没有更多数据可读了，退出循环
@@ -155,6 +157,35 @@ namespace MyServer {
         // ⭐ 极其致命的判断：如果全部发完了，务必关闭写事件！
         if (writeBuffer_.size() == 0) {
             channel_->disableWriting();
+        }
+    }
+
+    void TcpConnection::extendLife() {
+        // 1. 如果之前已经有一个秒表了，我们直接把它“标记删除”（惰性删除，O(1)复杂度）
+        // 这样大管家在处理时会自动忽略它，极其高效！
+        if (keepAliveTimer_) {
+            keepAliveTimer_->setDeleted();
+        }
+
+        // 2. 重新开启一个 30 秒的定时器！
+        std::weak_ptr<TcpConnection> weak_conn = shared_from_this();
+
+        keepAliveTimer_ = loop_->runAfter(30000, [weak_conn]() {
+            // 闹钟响了，尝试把 weak_ptr 提升为 shared_ptr
+            auto conn = weak_conn.lock();
+            if (conn) {
+                // 如果提升成功，说明连接还没被常规途径关闭，立刻执行踢人逻辑！
+                conn->handleTimeout();
+            }
+        });
+    }
+
+    void TcpConnection::handleTimeout() {
+        LOG_WARNING << "客户端 fd " << fd_ << " 长时间未发送数据，心跳超时，强制踢出！";
+        // 触发关闭回调，TcpServer 会负责把它从账本里删掉，并销毁堆内存
+        auto guard = shared_from_this();
+        if (closeCallback_) {
+            closeCallback_(guard);
         }
     }
 }

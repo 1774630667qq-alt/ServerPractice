@@ -93,6 +93,12 @@ public:
      */
     void enableReading();
 
+    /**
+     * @brief 取消所有事件的监听 (优雅注销)
+     * @details 将事件掩码清零，并更新底层的 epoll 实例。在对象析构前调用，防止发生幽灵事件。
+     */
+    void disableAll();
+
     // --- Getter 和 Setter ---
     int getFd() const { return fd_; }
     uint32_t getEvents() const { return events_; }

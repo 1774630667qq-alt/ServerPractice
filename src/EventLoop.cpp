@@ -4,6 +4,7 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h> // 提供 eventfd 函数
 #include <unistd.h> // 提供 close 函数
+#include "TimerQueue.hpp"
 
 namespace MyServer
 {
@@ -42,9 +43,12 @@ namespace MyServer
         // 绑定 eventfd 的读事件回调
         wakeupChannel_->setReadCallback(std::bind(&EventLoop::handleWakeup, this));
         wakeupChannel_->enableReading(); // 启用读事件监听
+        timerQueue_ = new TimerQueue(this); // 初始化定时器队列
     }
 
     EventLoop::~EventLoop() {
+        delete timerQueue_;
+        wakeupChannel_->disableAll(); 
         delete wakeupChannel_;
         close(wakeupFd_);
         if (epfd_ != -1) {
@@ -138,5 +142,9 @@ namespace MyServer
                 LOG_ERROR << "Epoll 修改 Channel 失败!";
             }
         }
+    }
+
+    std::shared_ptr<Timer> EventLoop::runAfter(int timeout_ms, TimeoutCallback cb) {
+        return timerQueue_->addTimer(timeout_ms, std::move(cb));
     }
 }
