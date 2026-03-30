@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 16:50:09
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-30 12:50:34
+ * @LastEditTime: 2026-03-30 21:51:35
  * @FilePath: /ServerPractice/include/HttpResponse.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -28,10 +28,11 @@ private:
 
     std::string filePath_;          ///< 用于保存要发送的文件路径
     size_t fileSize_;               ///< 要发送的文件大小 (字节)
+    bool isFile_;                   ///< 标识当前响应是否为发送文件
 
 public:
     // 默认构造一个成功的 200 响应
-    HttpResponse() : version_("HTTP/1.1"), statusCode_(200), statusMessage_("OK"), fileSize_(0) {
+    HttpResponse() : version_("HTTP/1.1"), statusCode_(200), statusMessage_("OK"), fileSize_(0), isFile_(false) {
         // 默认加上长连接关闭的请求头，避免浏览器转圈
         headers_["Connection"] = "keep-alive"; // 设置为长连接 
     }
@@ -49,6 +50,7 @@ public:
     
     void setBody(const std::string& body) {
         body_ = body;
+        isFile_ = false; // 若设置了普通文本，确保取消文件标记
         // 极其智能的一步：只要设置了 Body，自动计算并加上 Content-Length！
         // 彻底杜绝上次浏览器无限转圈的惨剧！
         headers_["Content-Length"] = std::to_string(body_.size());
@@ -83,6 +85,7 @@ public:
      * @return 如果文件存在且可读，返回 true；如果文件不存在，返回 false (业务层收到 false 可以立刻改发 404)
      */
     bool setFile(const std::string& filepath) {
+        isFile_ = true;
         /**
          * @brief 用于存储文件状态信息的结构体 (系统级结构体)
          * @details 该结构体由 stat() 系统调用填充，主要包含以下核心成员：
@@ -110,6 +113,7 @@ public:
             filePath_ = filepath;
             fileSize_ = file_stat.st_size;
             headers_["Content-Length"] = std::to_string(fileSize_);
+            isFile_ = true; // 成功读取到文件信息后，打上文件发送标记
             return true;
         }
         
@@ -119,6 +123,7 @@ public:
 
     std::string getFilePath() const { return filePath_; }
     size_t getFileSize() const { return fileSize_; }
+    bool isFile() const { return isFile_; }
 
     /**
      * @brief 序列化：现在只拼装 HTTP 头部了！(极其重要)

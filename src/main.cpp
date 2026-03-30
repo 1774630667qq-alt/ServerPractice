@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 15:35:21
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-27 18:29:25
+ * @LastEditTime: 2026-03-30 21:30:11
  * @FilePath: /ServerPractice/src/main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -54,8 +54,7 @@ int main() {
             res.setStatusCode(200, "OK");
             res.addHeader("Content-Type", "text/html; charset=utf-8");
             res.setBody("<h1>请登录</h1>");
-        } 
-        else {
+        } else {
             res.setStatusCode(404, "Not Found");
             res.addHeader("Content-Type", "text/html; charset=utf-8");
             res.setBody("<h1 style='color:red;'>404 找不到页面</h1>");

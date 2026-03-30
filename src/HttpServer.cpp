@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 17:41:20
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-26 19:48:12
+ * @LastEditTime: 2026-03-30 21:52:35
  * @FilePath: /ServerPractice/src/HttpServer.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -42,12 +42,17 @@ namespace MyServer {
             }
 
             // 5. 将最终的 response 对象序列化成字符串
-            std::string response_str = response.assemble();
+            bool is_file = response.isFile();
+            std::string response_str = is_file ? response.assembleHeaders() : response.assemble();
+            std::string file_path = response.getFilePath();
 
             // 6. 获取连接所属的 IO 线程，并将发送任务抛回给它执行
             EventLoop* loop = conn->getLoop();
-            loop->queueInLoop([conn, response_str] {
-                conn->send(response_str);
+            loop->queueInLoop([conn, response_str, is_file, file_path] {
+                conn->send(response_str); // 如果是文件只会发 Header，如果是普通文本则连带 Body 一起发送
+                if (is_file) {
+                    conn->sendFile(file_path); // 触发底层零拷贝传输
+                }
             });
         });
     }
