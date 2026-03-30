@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 15:29:42
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-29 22:42:44
+ * @LastEditTime: 2026-03-30 12:55:12
  * @FilePath: /ServerPractice/include/TcpConnection.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -10,6 +10,8 @@
 #include <functional>
 #include <string>
 #include <memory>
+#include <queue>
+#include <sys/types.h> // 提供 off_t 类型
 #include "Buffer.hpp"
 #include "Timer.hpp"
 
@@ -17,6 +19,30 @@ namespace MyServer {
 
 class EventLoop;
 class Channel;
+
+/**
+ * @brief 发送任务单元
+ * @details 统一管理要发送的数据。它可能是一段普通的 HTTP 头部文本，也可能是一个需要零拷贝发送的巨大文件。
+ */
+struct OutputItem {
+    bool is_file;           ///< 标志位：这是一个文件任务，还是普通的字符串任务？
+    
+    // --- 字符串任务专属 ---
+    std::string str_data;   ///< 如果是字符串，数据存在这里
+    
+    // --- 文件任务专属 ---
+    int file_fd;            ///< 如果是文件，存放底层打开的文件描述符
+    off_t file_offset;      ///< 当前文件发到哪个字节了
+    size_t file_size;       ///< 文件的总大小
+    
+    // 构造字符串任务
+    OutputItem(const std::string& str) 
+        : is_file(false), str_data(str), file_fd(-1), file_offset(0), file_size(0) {}
+        
+    // 构造文件任务
+    OutputItem(int fd, size_t size) 
+        : is_file(true), file_fd(fd), file_offset(0), file_size(size) {}
+};
 
 /**
  * @brief TCP 连接类：代表一个已经建立连接的客户端 (专属酒席)
@@ -30,7 +56,8 @@ private:
     int fd_;                ///< 与客户端通信的专属 fd
     Channel* channel_;      ///< 属于这个 fd 的专属通信管道 (服务员)
     Buffer buffer_;         ///< 读数据的缓冲区
-    Buffer writeBuffer_;    ///< 写数据的缓冲区
+    std::queue<OutputItem> outputQueue_; ///< 严格保序的发送任务队列
+    // Buffer writeBuffer_;    ///< 写数据的缓冲区
     std::shared_ptr<Timer> keepAliveTimer_; ///< 专属秒表：如果长时间没重置，它就会引爆！
 
     // --- 给上层大老板 (TcpServer) 留的汇报接口 ---
@@ -110,6 +137,12 @@ public:
      * @brief 为当前连接续命 (重置秒表)
      */
     void extendLife();
+
+    /**
+     * @brief 零拷贝发送文件接口
+     * @param filepath 要发送的本地文件绝对或相对路径
+     */
+    void sendFile(const std::string& filepath);
 };
 
 } // namespace MyServer
