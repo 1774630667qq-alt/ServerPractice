@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 16:50:09
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-30 21:51:35
+ * @LastEditTime: 2026-03-30 21:56:10
  * @FilePath: /ServerPractice/include/HttpResponse.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -85,7 +85,6 @@ public:
      * @return 如果文件存在且可读，返回 true；如果文件不存在，返回 false (业务层收到 false 可以立刻改发 404)
      */
     bool setFile(const std::string& filepath) {
-        isFile_ = true;
         /**
          * @brief 用于存储文件状态信息的结构体 (系统级结构体)
          * @details 该结构体由 stat() 系统调用填充，主要包含以下核心成员：
