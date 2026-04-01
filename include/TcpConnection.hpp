@@ -63,7 +63,7 @@ private:
     // --- 给上层大老板 (TcpServer) 留的汇报接口 ---
     
     ///< 当收到客人发来的消息时，触发此回调。参数1是当前连接的智能指针，参数2是收到的字符串
-    std::function<void(const std::shared_ptr<TcpConnection>&, const std::string&)> messageCallback_;
+    std::function<void(const std::shared_ptr<TcpConnection>&, Buffer*)> messageCallback_;
     
     ///< 当客人断开连接时，触发此回调。参数是当前连接的智能指针
     std::function<void(const std::shared_ptr<TcpConnection>&)> closeCallback_;
@@ -103,7 +103,7 @@ public:
     void handleWrite();
 
     // --- 注册回调的 Setter ---
-    void setMessageCallback(std::function<void(const std::shared_ptr<TcpConnection>&, const std::string&)> cb) {
+    void setMessageCallback(std::function<void(const std::shared_ptr<TcpConnection>&, Buffer*)> cb) {
         messageCallback_ = std::move(cb);
     }
     void setCloseCallback(std::function<void(const std::shared_ptr<TcpConnection>&)> cb) {

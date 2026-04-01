@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 16:50:05
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-26 16:50:21
+ * @LastEditTime: 2026-03-31 15:13:27
  * @FilePath: /ServerPractice/include/HttpRequest.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -27,7 +27,7 @@ private:
     std::string body_;      ///< 请求体（对于 GET 通常为空，POST 存放提交的数据）
 
 public:
-    HttpRequest() = default;
+    HttpRequest(): method_(""), path_(""), version_("") {};
     ~HttpRequest() = default;
 
     // --- Setter ---
@@ -36,10 +36,16 @@ public:
     void setVersion(const std::string& version) { version_ = version; }
     void addHeader(const std::string& key, const std::string& value) { headers_[key] = value; }
     void setBody(const std::string& body) { body_ = body; }
+    bool findHeader(const std::string& key) const {
+        return headers_.find(key) != headers_.end();
+    }
+
 
     // --- Getter ---
     std::string getMethod() const { return method_; }
-    std::string getPath() const { return path_; }
+    std::string getPath() const { 
+        return path_;
+    }
     std::string getVersion() const { return version_; }
     std::string getHeader(const std::string& key) const {
         auto it = headers_.find(key);
@@ -48,7 +54,9 @@ public:
         }
         return ""; // 如果没找到这个请求头，返回空字符串
     }
-    std::string getBody() const { return body_; }
+    std::string getBody() const { 
+        return body_; 
+    }
 };
 
 } // namespace MyServer

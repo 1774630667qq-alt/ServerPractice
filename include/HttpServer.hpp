@@ -12,6 +12,7 @@
 #include "HttpResponse.hpp"
 #include "ThreadPool.hpp"
 #include <functional>
+#include "Buffer.hpp"
 #include <memory>
 
 namespace MyServer {
@@ -34,7 +35,7 @@ private:
      * @brief 底层 TCP 收到消息时的中转站
      * @details 这里就是串联所有知识点的地方！
      */
-    void onMessage(std::shared_ptr<TcpConnection> conn, const std::string& msg);
+    void onMessage(std::shared_ptr<TcpConnection> conn, Buffer* buffer);
 
 public:
     HttpServer(EventLoop* loop, int port, ThreadPool* pool);

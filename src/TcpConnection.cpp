@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 15:29:51
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-30 21:20:32
+ * @LastEditTime: 2026-03-31 14:03:32
  * @FilePath: /ServerPractice/src/TcpConnection.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -35,6 +35,7 @@ namespace MyServer {
             }
             outputQueue_.pop();
         }
+        channel_->disableAll();
         delete channel_;
         ::close(fd_); // 必须关闭底层文件描述符，防止幽灵连接
     }
@@ -83,17 +84,8 @@ namespace MyServer {
             }
         }
 
-        // 读到数据了，进行解包
-        while (true) {
-            std::string msg = buffer_.extractHttpHeaders();
-            if (msg.empty()) {
-                // 没有完整消息了，退出解包循环
-                break; 
-            }
-            // 触发业务层回调，告诉大老板收到消息了
-            if (messageCallback_) {
-                messageCallback_(guard, msg);
-            }
+        if (messageCallback_) {
+            messageCallback_(guard, &buffer_);
         }
     }
 
@@ -203,8 +195,7 @@ namespace MyServer {
         // 如果发送队列已经空了，说明 handleWrite() 的工作完成了，可以暂时休息了，取消对 EPOLLOUT 的监听
         if (outputQueue_.empty()) {
             channel_->disableWriting();
-        } else { // 还有数据没发完，确保 EPOLLOUT 事件被监听着，等内核缓冲区有空位了继续发送
-            channel_->enableWriting();
+        } else { // 
             
         }
     }

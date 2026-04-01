@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-19 16:39:02
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-19 17:17:55
+ * @LastEditTime: 2026-03-31 16:08:09
  * @FilePath: /ServerPractice/src/Accept.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -49,6 +49,7 @@ namespace MyServer {
     }
 
     Acceptor::~Acceptor() {
+        acceptChannel_->disableAll();
         if (listen_fd_ != -1) {
             close(listen_fd_);
         }
@@ -67,6 +68,7 @@ namespace MyServer {
     void Acceptor::handleRead() {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
+        LOG_INFO << "有新连接到来，正在接受...";
         while (true) {
             int client_fd = accept(listen_fd_, (struct sockaddr*)&client_addr, &client_len);
             if (client_fd == -1) {

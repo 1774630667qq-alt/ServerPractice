@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-22 20:28:39
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-22 22:50:19
+ * @LastEditTime: 2026-03-31 14:20:22
  * @FilePath: /ServerPractice/include/Buffer.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -53,6 +53,13 @@ public:
     }
 
     /**
+     * @brief 从当前的缓冲区中http数据包中找到第一个\r\n\r\n
+     */
+    size_t findCRLF() const {
+        return buf_.find("\r\n\r\n");
+    }
+
+    /**
      * @brief 提取出一条完整的数据 (这需要根据你的协议来写)
      * * 假设我们的协议是：每条消息以 \n 结尾
      * @return 如果找到了一完整消息，返回它并从 Buffer 中删掉；如果不够一条，返回空字符串
@@ -86,8 +93,8 @@ public:
             // 找到了！提取出包含 \r\n\r\n 在内的完整 HTTP 头部
             size_t header_len = pos + 4; // "\r\n\r\n" 占用 4 个字节
             std::string header = buf_.substr(0, header_len); 
-            // 把提取走的头部从水池里删掉
-            buf_.erase(0, header_len); 
+            // 由于可能出现半包的情况，我们暂时不从 Buffer 中删除数据，等业务层解析完 HTTP 头部后再决定要不要删掉。
+            // buf_.erase(0, header_len); 
             return header;
         }
         

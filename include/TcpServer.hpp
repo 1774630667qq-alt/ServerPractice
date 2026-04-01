@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-20 16:06:48
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-22 20:44:14
+ * @LastEditTime: 2026-03-31 14:14:35
  * @FilePath: /ServerPractice/include/TcpServer.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -11,7 +11,7 @@
 #include <functional>
 #include <string>
 #include <memory>
-
+#include "Buffer.hpp"
 namespace MyServer {
 
 class EventLoop;
@@ -32,7 +32,7 @@ private:
     std::unordered_map<int, std::shared_ptr<TcpConnection>> connections_; 
 
     ///< 业务逻辑回调：让外部开发者决定，收到消息后到底该干嘛？(比如做回声、做HTTP解析等)
-    std::function<void(const std::shared_ptr<TcpConnection>&, const std::string&)> onMessageCallback_;
+    std::function<void(const std::shared_ptr<TcpConnection>&, Buffer*)> onMessageCallback_;
 
 public:
     /**
@@ -72,7 +72,7 @@ public:
      * @brief 业务逻辑暴露接口：注册当收到客户端消息时触发的回调
      * @param cb 回调签名，提供对应的连接智能指针 `std::shared_ptr<TcpConnection>` 以及解码出的纯文本信息 `const std::string&`
      */
-    void setOnMessageCallback(std::function<void(const std::shared_ptr<TcpConnection>&, const std::string&)> cb) {
+    void setOnMessageCallback(std::function<void(const std::shared_ptr<TcpConnection>&, Buffer*)> cb) {
         onMessageCallback_ = std::move(cb);
     }
 };

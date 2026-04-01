@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 17:41:20
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-30 21:52:35
+ * @LastEditTime: 2026-03-31 22:47:51
  * @FilePath: /ServerPractice/src/HttpServer.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -10,50 +10,73 @@
 #include "HttpParser.hpp"
 #include "TcpConnection.hpp"
 #include "EventLoop.hpp"
+#include "Logger.hpp"
+#include <string>
 
 namespace MyServer {
     HttpServer::HttpServer(EventLoop* loop, int port, ThreadPool* pool)
         : server_(loop, port), pool_(pool) {
         // 将 onMessage 绑定为 httpCallback_，让 TcpServer 在收到消息时调用 HttpServer::onMessage
-        server_.setOnMessageCallback([this](std::shared_ptr<TcpConnection> conn, const std::string& msg) {
-            this->onMessage(conn, msg);
+        server_.setOnMessageCallback([this](std::shared_ptr<TcpConnection> conn, Buffer* buffer) {
+            this->onMessage(conn, buffer);
         });
     }
 
-    void HttpServer::onMessage(std::shared_ptr<TcpConnection> conn, const std::string& msg) {
-        auto cb = httpCallback_; // 先把 httpCallback_ 拷贝到局部变量，避免后续被修改导致竞态条件
-        // 1. 将 onMessage 的处理逻辑扔进线程池，让工作线程来执行
-        pool_->enqueue([cb, conn, msg] {
-            // 2. 在工作线程里，创建一个 HttpRequest 对象，调用 HttpParser::parse(msg, &request) 解析。
-            HttpRequest request;
-            HttpResponse response;
-
-            // 3. 解析请求
-            if (!HttpParser::parse(msg, &request)) {
-                // 解析失败，准备 400 Bad Request 响应
-                response.setStatusCode(400, "Bad Request");
-                response.addHeader("Content-Type", "text/html; charset=utf-8");
-                response.setBody("<html><head><title>400 Bad Request</title></head><body><h1>400 Bad Request</h1><p>Your browser sent a request that this server could not understand.</p></body></html>");
-            } else {
-                // 4. 解析成功，呼叫业务层的代码：httpCallback_(request, response); （让业务层去填 response 的内容）。
-                if (cb) {
-                    cb(request, response);
-                }
+    void HttpServer::onMessage(std::shared_ptr<TcpConnection> conn, Buffer* buffer) {
+        auto cb = httpCallback_; // 先把回调函数复制一份到栈上，防止在后续的异步操作中被修改或销毁
+        while (true) {
+            if (buffer->findCRLF() == std::string::npos) { // 半包，继续等待
+                return;
             }
 
-            // 5. 将最终的 response 对象序列化成字符串
-            bool is_file = response.isFile();
-            std::string response_str = is_file ? response.assembleHeaders() : response.assemble();
-            std::string file_path = response.getFilePath();
+            LOG_INFO << "开始解释HTTP请求...";
 
-            // 6. 获取连接所属的 IO 线程，并将发送任务抛回给它执行
-            EventLoop* loop = conn->getLoop();
-            loop->queueInLoop([conn, response_str, is_file, file_path] {
-                conn->send(response_str); // 如果是文件只会发 Header，如果是普通文本则连带 Body 一起发送
-                if (is_file) {
-                    conn->sendFile(file_path); // 触发底层零拷贝传输
+            // 解析文件头
+            HttpParser parser;
+            HttpRequest request;
+
+            if (!parser.parse(buffer->extractHttpHeaders(), &request)) {
+                HttpResponse response;
+                response.setStatusCode(400, "Bad Request");
+                response.setBody("400 Bad Request");
+                conn->send(response.assemble());
+                LOG_ERROR << "Failed to parse HTTP request. Sent 400 Bad Request.";
+                return;
+            }
+
+            // 验证是否完整收到了请求体（如果有 Content-Length）
+            if (request.findHeader("Content-Length")) {
+                size_t content_length = std::stoul(request.getHeader("Content-Length"));
+                if (buffer->size() < content_length + buffer->findCRLF() + 4) {
+                    // 还没收全，继续等待
+                    return;
                 }
+                request.setBody(std::string(buffer->data() + buffer->findCRLF() + 4, content_length));
+            } 
+
+            // 已经完成首个 HTTP 请求的解析，接下来要把该请求从 Buffer 中删掉，准备解析下一个请求
+            size_t total_request_length = buffer->findCRLF() + 4 + request.getBody().size();
+            buffer->retrieve(total_request_length); // 从 Buffer 中删掉已经处理完的请求
+
+            HttpResponse response;
+            pool_->enqueue([cb, conn, request, response]() mutable {
+                if (cb) {
+                    cb(request, response); // 业务层处理请求，填充响应
+                }
+
+                bool isFile = response.isFile();
+                std::string response_str = isFile ? response.assembleHeaders() : response.assemble(); // 如果是文件，只拼装头部，文件内容留给 TcpConnection 的 sendfile 去发
+                std::string filePath = response.getFilePath();
+
+                EventLoop* loop = conn->getLoop();
+                loop->queueInLoop([conn, response_str, isFile, filePath]() {
+                    conn->send(response_str); // 先发响应行和响应头
+                    if (isFile) {
+                        conn->sendFile(filePath); // 再发文件内容
+                    }
+                });
+                
             });
-        });
+        }
     }
 } // namespace MyServer
