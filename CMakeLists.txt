@@ -3,6 +3,10 @@
 # @param <min> (如 3.10) 指定所需的最低 CMake 版本号。如果当前编译环境的 CMake 版本低于此值，将报错并停止配置。
 cmake_minimum_required(VERSION 3.10)
 
+# 让 CMake 自动生成 compile_commands.json，完美修复代码纠错和跳转定位 (Ctrl+点击)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+
 # 让编译器在展开 __FILE__ 时，自动把当前项目的绝对路径前缀替换为空字符串！
 add_compile_options(-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=)
 

@@ -14,11 +14,21 @@
 #include <sys/types.h> // 提供 off_t 类型
 #include "Buffer.hpp"
 #include "Timer.hpp"
+#include <atomic>
 
 namespace MyServer {
 
 class EventLoop;
 class Channel;
+
+/**
+ * @brief 原子状态机，枚举类型，用于表示连接的状态
+ */
+enum StateE { 
+    kConnected,     // 正常连接中
+    kDisconnecting, // 正在执行处决命令（微秒级过渡态）
+    kDisconnected   // 已经彻底死透了
+};
 
 /**
  * @brief 发送任务单元
@@ -59,6 +69,7 @@ private:
     std::queue<OutputItem> outputQueue_; ///< 严格保序的发送任务队列
     // Buffer writeBuffer_;    ///< 写数据的缓冲区
     std::shared_ptr<Timer> keepAliveTimer_; ///< 专属秒表：如果长时间没重置，它就会引爆！
+    std::atomic<StateE> state_; ///< 原子状态机，用于表示连接的状态
 
     // --- 给上层大老板 (TcpServer) 留的汇报接口 ---
     
@@ -143,6 +154,12 @@ public:
      * @param filepath 要发送的本地文件绝对或相对路径
      */
     void sendFile(const std::string& filepath);
+
+    /**
+     * @brief 强制关闭连接
+     * @details 立即触发 closeCallback_ 并注销自己
+     */
+    void forceClose();
 };
 
 } // namespace MyServer

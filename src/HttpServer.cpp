@@ -41,12 +41,25 @@ namespace MyServer {
                 response.setBody("400 Bad Request");
                 conn->send(response.assemble());
                 LOG_ERROR << "Failed to parse HTTP request. Sent 400 Bad Request.";
+                // 错误请求，直接关闭连接
+                conn->forceClose();
                 return;
             }
 
             // 验证是否完整收到了请求体（如果有 Content-Length）
             if (request.findHeader("Content-Length")) {
-                size_t content_length = std::stoul(request.getHeader("Content-Length"));
+                size_t content_length = 0;
+                try {
+                    content_length = std::stoul(request.getHeader("Content-Length"));
+                } catch (const std::exception& e) {
+                    LOG_ERROR << "Failed to parse Content-Length: " << e.what();
+                    HttpResponse response;
+                    response.setStatusCode(400, "Bad Request");
+                    response.setBody("400 Bad Request");
+                    conn->send(response.assemble());
+                    conn->forceClose();
+                    return;
+                }
                 if (buffer->size() < content_length + buffer->findCRLF() + 4) {
                     // 还没收全，继续等待
                     return;

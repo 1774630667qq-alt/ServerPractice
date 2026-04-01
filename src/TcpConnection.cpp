@@ -18,7 +18,7 @@
 
 namespace MyServer {
     TcpConnection::TcpConnection(EventLoop* loop, int fd)
-        : loop_(loop), fd_(fd) {
+        : loop_(loop), fd_(fd), state_(StateE::kConnected) {
         channel_ = new Channel(loop_, fd_);
         // 绑定读事件的回调函数
         channel_->setReadCallback(std::bind(&TcpConnection::handleRead, this));
@@ -84,8 +84,10 @@ namespace MyServer {
             }
         }
 
-        if (messageCallback_) {
-            messageCallback_(guard, &buffer_);
+        if (state_ == StateE::kConnected) {
+            if (messageCallback_) {
+                messageCallback_(guard, &buffer_);
+            }
         }
     }
 
@@ -195,8 +197,8 @@ namespace MyServer {
         // 如果发送队列已经空了，说明 handleWrite() 的工作完成了，可以暂时休息了，取消对 EPOLLOUT 的监听
         if (outputQueue_.empty()) {
             channel_->disableWriting();
-        } else { // 
-            
+        } else { // 说明此时缓冲区还有数据没发完，需要继续监听 EPOLLOUT 事件
+            channel_->enableWriting();
         }
     }
 
@@ -226,6 +228,24 @@ namespace MyServer {
         auto guard = shared_from_this();
         if (closeCallback_) {
             closeCallback_(guard);
+        }
+    }
+
+    void TcpConnection::forceClose() {
+        if (state_ == StateE::kConnected) {
+            auto guard = shared_from_this();
+            // 1. 立即修改状态机，防止新的读写事件被调度
+            state_ = StateE::kDisconnecting;
+            // 2. 取消所有定时器
+            if (keepAliveTimer_) {
+                keepAliveTimer_->setDeleted();
+            }
+            // 将任务丢回到 I/O 线程中处理
+            loop_->queueInLoop([this, guard]() {
+                if (closeCallback_) {
+                    closeCallback_(guard);
+                }
+            });
         }
     }
 }
