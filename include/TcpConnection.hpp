@@ -64,6 +64,7 @@ class TcpConnection : public std::enable_shared_from_this<TcpConnection> {
 private:
     EventLoop* loop_;       ///< 大管家 (所属的事件循环)
     int fd_;                ///< 与客户端通信的专属 fd
+    int connId_;            ///< 唯一连接 ID（由 TcpServer 分配，防止 fd 复用导致误删）
     Channel* channel_;      ///< 属于这个 fd 的专属通信管道 (服务员)
     Buffer buffer_;         ///< 读数据的缓冲区
     std::queue<OutputItem> outputQueue_; ///< 严格保序的发送任务队列
@@ -139,10 +140,26 @@ public:
     int getFd() const { return fd_; }
 
     /**
+     * @brief 设置唯一连接 ID
+     */
+    void setConnId(int id) { connId_ = id; }
+
+    /**
+     * @brief 获取唯一连接 ID
+     */
+    int getConnId() const { return connId_; }
+
+    /**
      * @brief 获取当前连接所属的事件循环 (EventLoop) 大管家
      * @return 指向所在的 EventLoop 对象的指针
      */
     EventLoop* getLoop() { return loop_; };
+
+    /**
+     * @brief 在 IO 线程中完成连接的初始化（注册 epoll 读事件）
+     * @details 必须在连接所属的 ioLoop 线程中调用，不可在主线程中直接调用
+     */
+    void connectEstablished();
 
     /**
      * @brief 为当前连接续命 (重置秒表)

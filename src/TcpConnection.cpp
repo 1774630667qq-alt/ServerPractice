@@ -18,12 +18,12 @@
 
 namespace MyServer {
     TcpConnection::TcpConnection(EventLoop* loop, int fd)
-        : loop_(loop), fd_(fd), state_(StateE::kConnected) {
+        : loop_(loop), fd_(fd), connId_(-1), state_(StateE::kConnected) {
         channel_ = new Channel(loop_, fd_);
         // 绑定读事件的回调函数
         channel_->setReadCallback(std::bind(&TcpConnection::handleRead, this));
         channel_->setWriteCallback(std::bind(&TcpConnection::handleWrite, this));
-        channel_->enableReading(); // 启用读事件
+        // 注意：不再在构造函数中 enableReading，必须等到 IO 线程中通过 connectEstablished() 来完成注册
     }
 
     TcpConnection::~TcpConnection() {
@@ -40,7 +40,13 @@ namespace MyServer {
         ::close(fd_); // 必须关闭底层文件描述符，防止幽灵连接
     }
 
+    void TcpConnection::connectEstablished() {
+        channel_->enableReading(); // 在 IO 线程中安全地注册 epoll 读事件
+    }
+
     void TcpConnection::handleRead() {
+        // 如果连接已经不在正常状态，直接忽略，防止重入
+        if (state_ != StateE::kConnected) return;
         // 使用智能指针守卫，防止在回调过程中自己被析构导致崩溃
         auto guard = shared_from_this();
         int active_fd = channel_->getFd();
@@ -65,22 +71,26 @@ namespace MyServer {
                     break;
                 } else {
                     LOG_ERROR << "Recv 失败!";
+                    state_ = StateE::kDisconnecting;
+                    channel_->disableAll(); // 立即从 epoll 中注销，防止后续事件重入
                     // 将回调拷贝到栈上，防止对象自杀导致段错误
                     auto cb = closeCallback_;
                     if (cb) {
                         cb(guard);
                     }
-                    break;
+                    return; // close 后直接返回，不再执行 messageCallback_
                 }
             } else {
                 // bytes_read == 0，客户端断开连接
                 LOG_INFO << "客户端 fd " << active_fd << " 断开连接";
+                state_ = StateE::kDisconnecting;
+                channel_->disableAll(); // 立即从 epoll 中注销，防止后续事件重入
                 // 同理，拷贝到栈上安全执行
                 auto cb = closeCallback_;
                 if (cb) {
                     cb(guard);
                 }
-                break;
+                return; // close 后直接返回，不再执行 messageCallback_
             }
         }
 
@@ -92,6 +102,7 @@ namespace MyServer {
     }
 
     void TcpConnection::send(const std::string& msg) {
+        if (state_ != StateE::kConnected) return; // 连接已断开，不再发送
         // 不论如何先把消息放到发送队列里，保证发送的顺序
         outputQueue_.push(OutputItem(msg));
         if (outputQueue_.size() == 1) { // 如果之前队列是空的，说明 handleWrite() 没有在工作，需要踢一脚它了
@@ -100,6 +111,7 @@ namespace MyServer {
     }
 
     void TcpConnection::sendFile(const std::string& filepath) {
+        if (state_ != StateE::kConnected) return; // 连接已断开，不再发送
         /**
          * @brief 打开一个文件并获取其文件描述符 (系统调用)
          * @signature int open(const char *pathname, int flags);
@@ -139,6 +151,7 @@ namespace MyServer {
     }
 
     void TcpConnection::handleWrite() {
+        if (state_ != StateE::kConnected) return; // 连接已断开，不再处理写事件
         auto guard = shared_from_this();
         while (!outputQueue_.empty()) {
             OutputItem& item = outputQueue_.front();
@@ -224,6 +237,9 @@ namespace MyServer {
 
     void TcpConnection::handleTimeout() {
         LOG_WARNING << "客户端 fd " << fd_ << " 长时间未发送数据，心跳超时，强制踢出！";
+        if (state_ != StateE::kConnected) return; // 已经在关闭了，不重复处理
+        state_ = StateE::kDisconnecting;
+        channel_->disableAll(); // 立即从 epoll 中注销，防止后续事件重入
         // 触发关闭回调，TcpServer 会负责把它从账本里删掉，并销毁堆内存
         auto guard = shared_from_this();
         if (closeCallback_) {
@@ -242,6 +258,7 @@ namespace MyServer {
             }
             // 将任务丢回到 I/O 线程中处理
             loop_->queueInLoop([this, guard]() {
+                channel_->disableAll(); // 在 IO 线程中注销 epoll，防止后续事件重入
                 if (closeCallback_) {
                     closeCallback_(guard);
                 }

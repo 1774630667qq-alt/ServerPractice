@@ -9,9 +9,9 @@
 #pragma once
 #include <unordered_map>
 #include <functional>
-#include <string>
 #include <memory>
 #include "Buffer.hpp"
+#include "EventLoopThreadPool.hpp"
 namespace MyServer {
 
 class EventLoop;
@@ -33,6 +33,8 @@ private:
 
     ///< 业务逻辑回调：让外部开发者决定，收到消息后到底该干嘛？(比如做回声、做HTTP解析等)
     std::function<void(const std::shared_ptr<TcpConnection>&, Buffer*)> onMessageCallback_;
+    std::unique_ptr<EventLoopThreadPool> threadPool_;
+    int nextConnId_;  ///< 单调递增的连接 ID，用于唯一标识每个连接（防止 fd 复用导致误删）
 
 public:
     /**
@@ -69,11 +71,25 @@ public:
     void removeConnection(const std::shared_ptr<TcpConnection>& conn);
 
     /**
+     * @brief 在主线程中安全地执行连接移除操作
+     * @details 由 removeConnection 投递到主线程执行，保证 connections_ map 只在主线程被访问
+     */
+    void removeConnectionInLoop(const std::shared_ptr<TcpConnection>& conn);
+
+    /**
      * @brief 业务逻辑暴露接口：注册当收到客户端消息时触发的回调
      * @param cb 回调签名，提供对应的连接智能指针 `std::shared_ptr<TcpConnection>` 以及解码出的纯文本信息 `const std::string&`
      */
     void setOnMessageCallback(std::function<void(const std::shared_ptr<TcpConnection>&, Buffer*)> cb) {
         onMessageCallback_ = std::move(cb);
+    }
+
+    /**
+     * @brief 向外暴露的设置线程池数量的接口
+     * @param numThreads 线程池数量
+     */
+    void setThreadNum(int numThreads) {
+        threadPool_->setThreadNum(numThreads);
     }
 };
 
