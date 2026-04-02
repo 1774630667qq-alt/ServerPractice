@@ -6,6 +6,14 @@ cmake_minimum_required(VERSION 3.10)
 # 让 CMake 自动生成 compile_commands.json，完美修复代码纠错和跳转定位 (Ctrl+点击)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# 设置编译选项
+# @param CMAKE_CXX_FLAGS 要设置的编译选项
+# @param -O3 优化选项，开启最高级别的代码优化
+# @param -Wall 开启所有警告
+# @param -g 开启调试信息
+# @param -pthread 开启多线程支持
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -g -pthread")
+
 
 # 让编译器在展开 __FILE__ 时，自动把当前项目的绝对路径前缀替换为空字符串！
 add_compile_options(-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=)

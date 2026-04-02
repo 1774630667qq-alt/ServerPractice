@@ -96,6 +96,10 @@ public:
      * @param cb 需要在主线程执行的函数
      */
     void queueInLoop(std::function<void()> cb);
+
+    void quit() {
+        quit_ = true;
+    }
 };
 
 } // namespace MyServer

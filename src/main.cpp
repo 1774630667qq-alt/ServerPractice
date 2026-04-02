@@ -36,7 +36,7 @@ int main() {
     signal(SIGPIPE, SIG_IGN);
     MyServer::initGlobalLogger("MyServerLog"); // 初始化全局日志系统，日志文件前缀为 "MyServerLog"
     EventLoop loop;
-    ThreadPool pool(4);
+    ThreadPool pool(8);
     
     // 1. 创建你的 Web 服务器
     HttpServer http_server(&loop, 8080, &pool);

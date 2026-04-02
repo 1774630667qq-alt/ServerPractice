@@ -18,7 +18,7 @@
 #include <fcntl.h>      // 提供 fcntl
 
 namespace MyServer {
-    Acceptor::Acceptor(EventLoop* loop, int port) : loop_(loop),port_(port), listen_fd_(-1), acceptChannel_(nullptr) {
+    Acceptor::Acceptor(EventLoop* loop, int port) : loop_(loop), listen_fd_(-1), acceptChannel_(nullptr), port_(port) {
         // --- 1. 创建监听套接字 ---
         listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
         if (listen_fd_ == -1) {

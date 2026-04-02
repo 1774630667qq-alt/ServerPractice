@@ -157,7 +157,7 @@ namespace MyServer {
                 ssize_t bytes_sent = sendfile(fd_, item.file_fd, &item.file_offset, item.file_size - item.file_offset);
                 if (bytes_sent > 0) {
                     // 检查是否发送完成
-                    if (bytes_sent == item.file_size - item.file_offset) {
+                    if (static_cast<size_t>(bytes_sent) == item.file_size - static_cast<size_t>(item.file_offset)) {
                         // 文件发送完成，关闭文件描述符并从队列中移除
                         ::close(item.file_fd);
                         outputQueue_.pop();
