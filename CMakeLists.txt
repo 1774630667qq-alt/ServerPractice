@@ -1,73 +1,97 @@
-# @brief 设置项目所需的最低 CMake 版本要求。
-# @param VERSION 关键字，指明后续的参数是版本号。
-# @param <min> (如 3.10) 指定所需的最低 CMake 版本号。如果当前编译环境的 CMake 版本低于此值，将报错并停止配置。
+# ##############################################################################
+# 项目: ServerPractice (高性能并发服务器框架)
+# 功能: 核心网络抽象、事件驱动 Reactor 模型与数据库集成
+# ##############################################################################
+
 cmake_minimum_required(VERSION 3.10)
 
-# 让 CMake 自动生成 compile_commands.json，完美修复代码纠错和跳转定位 (Ctrl+点击)
+# 让 CMake 自动生成 compile_commands.json，利于 VSCode/Antigravity 等 IDE 解析
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# 设置编译选项
-# @param CMAKE_CXX_FLAGS 要设置的编译选项
-# @param -O3 优化选项，开启最高级别的代码优化
-# @param -Wall 开启所有警告
-# @param -g 开启调试信息
-# @param -pthread 开启多线程支持
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -g -pthread")
-
-
-# 让编译器在展开 __FILE__ 时，自动把当前项目的绝对路径前缀替换为空字符串！
-add_compile_options(-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=)
-
-# @brief 定义项目名称及基本属性。
-# @param <PROJECT-NAME> (如 ServerPractice) 项目的名称。调用此命令后，CMake 会隐式生成 PROJECT_NAME 等相关内置变量供后续使用。
-project(ServerPractice)
-
-# @brief 将指定的 CMake 变量设置为给定的值。
-# @param <variable> (如 CMAKE_CXX_STANDARD) 要设置的变量名称。
-# @param <value>... (如 17 或 True) 要赋给该变量的值（可以是多个值，以空格分隔）。
+# ------------------------------------------------------------------------------
+# 1. 编译选项配置
+# ------------------------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
-
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# @brief 将指定的目录添加到编译器的头文件搜索路径中。
-# @param [AFTER|BEFORE] (可选) 控制目录是追加到现有搜索路径列表的末尾还是插入到开头。
-# @param [SYSTEM] (可选) 将这些目录标记为系统包含目录，通常编译器会抑制在系统目录头文件中发现的警告。
-# @param <dir>... (如 include) 要添加的目录路径列表。
+# -O3: 强力优化, -Wall: 开启所有警告, -g: 保留调试信息, -pthread: 启用多线程支持
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -g -pthread")
+
+# 去除 __FILE__ 宏中的绝对路径前缀，保护隐私并缩减二进制体积
+add_compile_options(-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=)
+
+project(ServerPractice)
+
+# ------------------------------------------------------------------------------
+# 2. 依赖库管理 (MySQL, Pthread)
+# ------------------------------------------------------------------------------
+
+# 使用 PkgConfig 自动查找 MySQL 客户端开发库
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(MYSQL REQUIRED mysqlclient)
+
+# 包含路径配置
+# SYSTEM 关键字可以抑制第三方库头文件产生的警告
+include_directories(SYSTEM ${MYSQL_INCLUDE_DIRS})
 include_directories(include)
 
-# @brief 搜索匹配指定模式的文件路径，并将结果保存到变量中。
-# @param GLOB 关键字，表示基于通配符进行文件匹配（注：匹配得到的是绝对路径列表）。
-# @param <variable> (如 SRC_FILES) 用于保存匹配结果的变量名。
-# @param <globbing-expressions>... (如 "src/*.cpp") 要匹配的路径通配符。
-file(GLOB SRC_FILES "src/*.cpp")
+# 定义项目通用的第三方库列表 (避免在每个 target 下重复书写)
+set(COMMON_LIBS 
+    server_core 
+    pthread 
+    ${MYSQL_LIBRARIES}
+)
 
-# @brief 对 CMake 列表变量执行特定操作（如追加、查找、移除等）。
-# @param REMOVE_ITEM 关键字，表示从列表中移除指定的值。
-# @param <list> (如 SRC_FILES) 要进行操作的列表变量名。
-# @param <items>... (如 "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp") 要移除的具体项。因 GLOB 返回绝对路径，此处需拼接 CMAKE_CURRENT_SOURCE_DIR 以精确匹配并剔除 main.cpp。
+# ------------------------------------------------------------------------------
+# 3. 核心库 (Static Library)
+# ------------------------------------------------------------------------------
+
+# 搜集 src 目录下的所有源文件 (排除 main.cpp)
+file(GLOB SRC_FILES "src/*.cpp")
 list(REMOVE_ITEM SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
 
-# @brief 将公共源文件编译成一个静态库，避免同一个文件被重复编译多次
-# @param <name> (如 server_core) 库的名称
-# @param [STATIC|SHARED|MODULE] 指定创建静态库、动态库还是模块库
+# 构建服务器核心静态库，避免重复编译
 add_library(server_core STATIC ${SRC_FILES})
 
-# @brief 使用指定的源文件来构建目标可执行文件。
-# @param <name> (如 main) 构建出的可执行文件的名称，此名称在整个 CMake 项目中必须全局唯一。
-# @param [WIN32] (可选) 用于 Windows 平台，指示构建一个基于 GUI 的 Win32 应用程序（无控制台窗口）。
-# @param [MACOSX_BUNDLE] (可选) 用于 macOS 平台，指示构建一个 App Bundle（GUI 应用程序）。
-# @param [EXCLUDE_FROM_ALL] (可选) 如果指定，该目标将不会包含在默认的构建目标（如 make all）中，必须显式指定构建。
-# @param <source>... (如 src/main.cpp) 用于编译生成该可执行文件所需的源文件列表。
+# ------------------------------------------------------------------------------
+# 4. 可执行程序 (Executables)
+# ------------------------------------------------------------------------------
+
+# 主程序
 add_executable(main src/main.cpp)
 
+# 示例: 基础 Echo 服务
 add_executable(EchoSever EchoSever.cpp)
 
+# 示例: 基于线程池的 Echo 服务
 add_executable(EchoSeverByThreadPool EchoSeverByThreadPool.cpp)
 
-# @brief 将给定的库或标志链接到指定目标上。
-# @param <target> (如 main) 必须是由 add_executable 或 add_library 创建的目标名称。
-# @param <PRIVATE|PUBLIC|INTERFACE> 声明依赖的传播范围。PRIVATE 表示仅该目标自身链接该库。
-# @param <item>... (如 pthread) 要链接的系统库名称（Linux 环境下使用 std::thread 等需链接 pthread）。
-target_link_libraries(main PRIVATE server_core pthread)
-target_link_libraries(EchoSever PRIVATE server_core pthread)
-target_link_libraries(EchoSeverByThreadPool PRIVATE server_core pthread)
+# 其他测试程序 (如果存在)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SocketTest.cpp")
+    add_executable(SocketTest SocketTest.cpp)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/custom_deleter_test.cpp")
+    add_executable(custom_deleter_test custom_deleter_test.cpp)
+endif()
+
+# ------------------------------------------------------------------------------
+# 5. 链接管理
+# ------------------------------------------------------------------------------
+
+# 将通用库链接到所有 Target
+target_link_libraries(main PRIVATE ${COMMON_LIBS})
+target_link_libraries(EchoSever PRIVATE ${COMMON_LIBS})
+target_link_libraries(EchoSeverByThreadPool PRIVATE ${COMMON_LIBS})
+
+if(TARGET SocketTest)
+    target_link_libraries(SocketTest PRIVATE ${COMMON_LIBS})
+endif()
+
+if(TARGET custom_deleter_test)
+    target_link_libraries(custom_deleter_test PRIVATE ${COMMON_LIBS})
+endif()
+
+# ##############################################################################
+# 配置完毕. 使用 cmake .. && make 构建
+# ##############################################################################

@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 16:50:05
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-31 15:13:27
+ * @LastEditTime: 2026-04-03 18:12:18
  * @FilePath: /ServerPractice/include/HttpRequest.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -56,6 +56,29 @@ public:
     }
     std::string getBody() const { 
         return body_; 
+    }
+    std::string getuserbybody() const {
+        if (body_.find("user=") != std::string::npos) {
+            size_t start = body_.find("user=") + 5;
+            size_t end = body_.find("&", start);
+            if (end != std::string::npos) {
+                return body_.substr(start, end - start);
+            }
+            return body_.substr(start);
+        }
+        return "";
+    }
+
+    std::string getpwdbybody() const {
+        if (body_.find("pwd=") != std::string::npos) {
+            size_t start = body_.find("pwd=") + 4;
+            size_t end = body_.find("&", start);
+            if (end != std::string::npos) {
+                return body_.substr(start, end - start);
+            }
+            return body_.substr(start);
+        }
+        return "";
     }
 };
 
