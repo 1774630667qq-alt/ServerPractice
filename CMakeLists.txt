@@ -29,10 +29,11 @@ project(ServerPractice)
 # 使用 PkgConfig 自动查找 MySQL 客户端开发库
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MYSQL REQUIRED mysqlclient)
+pkg_check_modules(HIREDIS REQUIRED hiredis)
 
 # 包含路径配置
 # SYSTEM 关键字可以抑制第三方库头文件产生的警告
-include_directories(SYSTEM ${MYSQL_INCLUDE_DIRS})
+include_directories(SYSTEM ${MYSQL_INCLUDE_DIRS} ${HIREDIS_INCLUDE_DIRS})
 include_directories(include)
 
 # 定义项目通用的第三方库列表 (避免在每个 target 下重复书写)
@@ -40,6 +41,7 @@ set(COMMON_LIBS
     server_core 
     pthread 
     ${MYSQL_LIBRARIES}
+    ${HIREDIS_LIBRARIES}
 )
 
 # ------------------------------------------------------------------------------

@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 15:35:21
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-04-03 20:48:34
+ * @LastEditTime: 2026-04-03 21:12:00
  * @FilePath: /ServerPractice/src/main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -84,11 +84,18 @@ int main() {
                 MYSQL* sql;
                 SqlConnRAII guard(&sql, &SqlConnPool::Instance());
 
-                // 3. 拼装 SQL 语句 (注意防范 SQL 注入，但作为第一版我们可以先简单拼接)
+                // 3. 拼装 SQL 语句
                 char sql_stmt[256] = {0};
                 snprintf(sql_stmt, 256, "SELECT password FROM user WHERE username='%s'", username.c_str());
 
                 // 4. 发射 SQL 语句！
+                /**
+                 * @brief 执行指向由null结尾的字符串的SQL查询
+                 * @signature int mysql_query(MYSQL *mysql, const char *stmt_str);
+                 * @param mysql 连接句柄
+                 * @param stmt_str 以null结尾的包含要执行SQL语句的字符串
+                 * @return 成功返回0，如果有错误发生则返回非0值
+                 */
                 if (mysql_query(sql, sql_stmt)) {
                     res.setStatusCode(500, "Internal Server Error");
                     res.setBody("数据库查询崩溃啦！");
@@ -96,8 +103,22 @@ int main() {
                 }
 
                 // 5. 提取并比对结果
+                /**
+                 * @brief MYSQL_RES是一个结构体，用于表示返回行的查询结果(如SELECT, SHOW, DESCRIBE, EXPLAIN)
+                 * @brief mysql_store_result()将查询的全部结果读取到客户端，分配一个MYSQL_RES结构体，并将结果放入此结构中
+                 * @signature MYSQL_RES *mysql_store_result(MYSQL *mysql);
+                 * @param mysql 连接句柄
+                 * @return 成功返回包含查询结果的MYSQL_RES结果集指针，如果出错或没有结果(例如是一个INSERT语句)则返回nullptr
+                 */
                 MYSQL_RES* result = mysql_store_result(sql);
                 if (result != nullptr) {
+                    /**
+                     * @brief MYSQL_ROW是字符串数组的安全表示形式。它指向结果集中的当前行，列值可以当作字符串访问
+                     * @brief mysql_fetch_row()从结果集中检索下一行
+                     * @signature MYSQL_ROW mysql_fetch_row(MYSQL_RES *result);
+                     * @param result 通过mysql_store_result()获得的结果集指针
+                     * @return 成功返回包含下一行值的MYSQL_ROW结构，如果没有更多的行可供检索或发生错误，返回nullptr
+                     */
                     MYSQL_ROW row = mysql_fetch_row(result);
                     res.addHeader("Content-Type", "text/html; charset=utf-8");
                     if (row != nullptr) {
