@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 15:35:21
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-04-03 21:12:00
+ * @LastEditTime: 2026-04-04 13:35:43
  * @FilePath: /ServerPractice/src/main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -19,6 +19,39 @@
 #include "Logger.hpp"
 #include <thread> // 引入并发线程库
 #include "SqlConnRAII.hpp"
+#include <random>
+#include <hiredis/hiredis.h>
+#include "RedisConnRAII.hpp"
+#include "RedisConnPool.hpp"
+
+/**
+ * @brief 生成密码学安全的随机字符串，用作登录凭证
+ * 
+ * @param length 随机字符串的长度
+ * @return std::string 生成的随机字符串
+ */
+std::string generateSecureCookieToken(size_t length) {
+    // 定义字符集
+    std::string base = 
+                "abcdefghijklmnopqrstuvwxyz"
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "0123456789"
+                "!@#$%^&*()";
+    
+    std::string token;
+    token.reserve(length);
+    
+    // 提供密码学安全的随机数发生器
+    std::random_device rd;
+
+    // 使用均匀分布，避免取模偏差
+    std::uniform_int_distribution<size_t> dist(0, base.size() - 1);
+
+    for (size_t i = 0; i < length; ++i) {
+        token += base[dist(rd)];
+    }
+    return token;
+}
 
 using namespace MyServer;
 
@@ -63,6 +96,7 @@ int main() {
     HttpServer http_server(&loop, 8080, &pool);
     http_server.setThreadNum(io_threads);
     MyServer::SqlConnPool::Instance().Init("127.0.0.1", 3306, "root", "123456", "testdb", 10);
+    MyServer::RedisConnPool::Instance().Init("127.0.0.1", 6379, "123456", 10);
 
     // 2. 业务层专心写路由逻辑，再也不用管 TCP、线程和 fd 了！
     http_server.setHttpCallback([](const HttpRequest& req, HttpResponse& res) {
@@ -79,6 +113,7 @@ int main() {
                 // (注意：你需要自己去实现提取逻辑，假设提取为 username 和 password 变量)
                 std::string username = req.getuserbybody();
                 std::string password = req.getpwdbybody();
+                std::string token = req.getHeader("token");
 
                 // 2. 召唤 RAII 神器，从池子里“借”一个数据库连接
                 MYSQL* sql;
@@ -124,6 +159,20 @@ int main() {
                     if (row != nullptr) {
                         std::string db_password(row[0]);
                         if (password == db_password) {
+                            // 登陆成功后，生成一个生命周期为30分钟的随机字符串作为token发给浏览器
+                            std::string token = generateSecureCookieToken(32);
+                            redisContext *redis;
+                            RedisConnRAII guard(&redis, &RedisConnPool::Instance());
+                            redisReply *reply = (redisReply*)redisCommand(redis, "SET %s %s EX %d", token.c_str(), username.c_str(), 1800);
+                            if (reply == nullptr || reply->type == REDIS_REPLY_ERROR) {
+                                LOG_ERROR << "Redis 密码验证失败: " << reply->str;
+                                freeReplyObject(reply);
+                                res.setStatusCode(500, "Internal Server Error");
+                                res.setBody("Redis 密码验证失败");
+                                return;
+                            }
+                            freeReplyObject(reply);
+                            
                             res.setStatusCode(200, "OK");
                             res.setBody("<h1>尊贵的 " + username + "，欢迎回来！</h1>");
                         } else {

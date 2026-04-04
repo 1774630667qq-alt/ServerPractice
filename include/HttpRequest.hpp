@@ -43,10 +43,13 @@ public:
 
     // --- Getter ---
     std::string getMethod() const { return method_; }
+
     std::string getPath() const { 
         return path_;
     }
+
     std::string getVersion() const { return version_; }
+
     std::string getHeader(const std::string& key) const {
         auto it = headers_.find(key);
         if (it != headers_.end()) {
@@ -54,9 +57,28 @@ public:
         }
         return ""; // 如果没找到这个请求头，返回空字符串
     }
+
     std::string getBody() const { 
         return body_; 
     }
+
+    std::string getCookie(const std::string& key) const {
+        auto it = headers_.find("Cookie");
+        if (it != headers_.end()) {
+            const std::string& cookie = it->second;
+            size_t start = cookie.find(key + "=");
+            if (start != std::string::npos) {
+                start += key.size() + 1;
+                size_t end = cookie.find(";", start);
+                if (end != std::string::npos) {
+                    return cookie.substr(start, end - start);
+                }
+                return cookie.substr(start);
+            }
+        }
+        return "";
+    }
+
     std::string getuserbybody() const {
         if (body_.find("user=") != std::string::npos) {
             size_t start = body_.find("user=") + 5;

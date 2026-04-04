@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-26 16:50:09
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-03-30 21:56:10
+ * @LastEditTime: 2026-04-04 13:11:25
  * @FilePath: /ServerPractice/include/HttpResponse.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -54,6 +54,16 @@ public:
         // 极其智能的一步：只要设置了 Body，自动计算并加上 Content-Length！
         // 彻底杜绝上次浏览器无限转圈的惨剧！
         headers_["Content-Length"] = std::to_string(body_.size());
+    }
+
+    /**
+     * @brief 设置 Cookie
+     * @param key Cookie 的键
+     * @param val Cookie 的值
+     * @param Max_age Cookie 的最大存活时间
+     */
+    void set_cookie(const std::string& key, const std::string& val, int Max_age) {
+        headers_["Set-Cookie"] = key + "=" + val + "; Max-Age=" + std::to_string(Max_age);
     }
 
     // --- 核心序列化功能 ---

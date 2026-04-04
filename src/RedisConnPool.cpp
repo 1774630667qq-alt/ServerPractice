@@ -2,13 +2,14 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-04-03 23:24:58
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-04-03 23:33:24
+ * @LastEditTime: 2026-04-04 00:04:31
  * @FilePath: /ServerPractice/src/RedisConnPool.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置
  * 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #include "RedisConnPool.hpp"
 #include "Logger.hpp"
+#include <cstdlib>
 
 namespace MyServer {
 void RedisConnPool::Init(const char* host, int port, const char* pwd, int connSize) {
@@ -30,8 +31,13 @@ void RedisConnPool::Init(const char* host, int port, const char* pwd, int connSi
          * @return 成功时返回 redisContext 指针，失败时返回 nullptr 或包含错误信息的上下文
          */
         redisContext* conn = redisConnect(host, port);
-        if (conn == nullptr) {
-            LOG_ERROR << "Redis 连接失败";
+        if (conn == nullptr || conn->err) {
+            if (conn -> err) {
+                redisFree(conn);
+                LOG_ERROR << "Redis 连接失败: " << conn->errstr;
+            } else {
+                LOG_ERROR << "Redis 连接失败";
+            }
             // 出现问题，直接关闭连接池并杀死程序
             ClosePool();
             exit(EXIT_FAILURE);
@@ -45,8 +51,13 @@ void RedisConnPool::Init(const char* host, int port, const char* pwd, int connSi
              * @return 成功时返回包含执行结果的 redisReply 指针，失败时返回 nullptr
              */
             redisReply* reply = (redisReply*)redisCommand(conn, "AUTH %s", pwd);
-            if (reply == nullptr) {
-                LOG_ERROR << "Redis 密码验证失败";
+            if (reply == nullptr || reply->type == REDIS_REPLY_ERROR) {
+                if (reply == nullptr) {
+                    LOG_ERROR << "Redis 密码验证失败";
+                } else {
+                    LOG_ERROR << "Redis 密码验证失败: " << reply->str;
+                    freeReplyObject(reply);
+                }
                 // 出现问题，直接关闭连接池并杀死程序
                 ClosePool();
                 exit(EXIT_FAILURE);
@@ -80,6 +91,11 @@ redisContext* RedisConnPool::GetConn() {
 
 void RedisConnPool::FreeConn(redisContext* conn) {
     std::unique_lock<std::mutex> lock(mtx_);
+    
+    if (conn == nullptr) {
+        return;
+    }
+
     if (isClosed_) {
         lock.unlock();
         /**

@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-04-03 23:06:54
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-04-03 23:34:18
+ * @LastEditTime: 2026-04-03 23:57:13
  * @FilePath: /ServerPractice/include/RedisConnPool.hpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置
  * 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
@@ -65,7 +65,7 @@ private:
      * @brief 构造函数私有化
      * @details 剥夺外部创建对象的权力
      */
-    RedisConnPool() : useCount_(0), freeCount_(0), MAX_CONN_(0), isClosed_(false), isInit_(false) {}
+    RedisConnPool() : MAX_CONN_(0), useCount_(0), freeCount_(0), isClosed_(false), isInit_(false) {}
     
     /**
      * @brief 析构函数私有化

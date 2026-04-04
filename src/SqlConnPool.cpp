@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-04-03 16:36:34
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-04-03 17:43:16
+ * @LastEditTime: 2026-04-04 00:04:53
  * @FilePath: /ServerPractice/src/SqlConnPoolsrc.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置
  * 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
@@ -81,6 +81,11 @@ MYSQL* SqlConnPool::GetConn() {
 
 void SqlConnPool::FreeConn(MYSQL* conn) {
     std::unique_lock<std::mutex> lock(mtx_);
+    
+    if (conn == nullptr) {
+        return;
+    }
+
     if (isClose_) { // 如果连接池已关闭，直接销毁连接
         lock.unlock();
         mysql_close(conn);
