@@ -2,7 +2,7 @@
  * @Author: Zhang YuHua 1774630667@qq.com
  * @Date: 2026-03-17 15:35:21
  * @LastEditors: Zhang YuHua 1774630667@qq.com
- * @LastEditTime: 2026-04-04 13:35:43
+ * @LastEditTime: 2026-04-04 15:09:59
  * @FilePath: /ServerPractice/src/main.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -11,6 +11,7 @@
 #include "TcpServer.hpp"
 #include "TcpConnection.hpp"
 #include "ThreadPool.hpp"
+#include <read.h>
 #include <unistd.h>
 #include <signal.h>
 #include "HttpResponse.hpp"
@@ -113,7 +114,6 @@ int main() {
                 // (注意：你需要自己去实现提取逻辑，假设提取为 username 和 password 变量)
                 std::string username = req.getuserbybody();
                 std::string password = req.getpwdbybody();
-                std::string token = req.getHeader("token");
 
                 // 2. 召唤 RAII 神器，从池子里“借”一个数据库连接
                 MYSQL* sql;
@@ -172,9 +172,12 @@ int main() {
                                 return;
                             }
                             freeReplyObject(reply);
+
+                            // 将 token 作为 Cookie 发给浏览器
+                            res.addHeader("Set-Cookie", ("token=" + token + "; Max-Age=1800; HttpOnly; Path=/; SameSite=Lax").c_str());
                             
                             res.setStatusCode(200, "OK");
-                            res.setBody("<h1>尊贵的 " + username + "，欢迎回来！</h1>");
+                            res.setBody("<h1>尊贵的 " + username + "，欢迎回来！访问我们的主页<a href='/index'>主页</a></h1>");
                         } else {
                             res.setStatusCode(401, "Unauthorized");
                             res.setBody("<h1>密码错误，你是不是冒充的？</h1>");
@@ -186,6 +189,21 @@ int main() {
                     mysql_free_result(result); 
                 }
             } else {
+                std::string token = req.getCookie("token");
+                if (token != "") { // 已经有一个令牌了，检查一下是否是已经登陆的用户
+                    redisContext* redis;
+                    RedisConnRAII guard(&redis, &RedisConnPool::Instance());
+                    redisReply* reply = (redisReply*)redisCommand(redis, "GET %s", token.c_str());
+                    if (reply != nullptr && reply->type == REDIS_REPLY_STRING) {
+                        res.setStatusCode(200, "OK");
+                        res.addHeader("Content-Type", "text/html; charset=utf-8");
+                        res.setBody("<h1>尊贵的 " + std::string(reply->str) + "，欢迎回来！访问我们的主页<a href='/index'>主页</a></h1>");
+                        return;
+                    }
+                    freeReplyObject(reply);
+                }
+
+                // 说明令牌已经过期了或者是一个无效令牌，继续执行后续的指令
                 res.setStatusCode(200, "OK");
                 res.addHeader("Content-Type", "text/html; charset=utf-8");
                 res.setBody("<form method='POST' action='/login'>账号: <input name='user'><br>密码: <input name='pwd'><br><button>登录</button></form>");
@@ -200,13 +218,61 @@ int main() {
                 res.setBody("<h1 style='color:red;'>404 找不到图片</h1>");
             }
         } else if (req.getPath() == "/index") {
-            if (res.setFile("/home/bazinga/ServerPractice/Html/index.html")) {
+            std::string token = req.getCookie("token");
+
+            // 若 token 不存在，则返回 401
+            if (token.empty()) {
+                res.setStatusCode(401, "Unauthorized");
                 res.addHeader("Content-Type", "text/html; charset=utf-8");
-            } else {
-                res.setStatusCode(404, "Not Found");
-                res.addHeader("Content-Type", "text/html; charset=utf-8");
-                res.setBody("<h1 style='color:red;'>404 找不到页面</h1>");
+                res.setBody("<h1>请先登录 <a href='/login'>登录</a></h1>");
+                return;
             }
+
+            // 验证 token 是否有效
+            redisContext *redis;
+            RedisConnRAII guard(&redis, &RedisConnPool::Instance());
+            redisReply *reply = (redisReply*)redisCommand(redis, "GET %s", token.c_str());
+            
+            if (reply != nullptr && reply->type == REDIS_REPLY_STRING) {
+                // 这是一个合法登陆用户
+                std::string current_user = reply->str;
+                freeReplyObject(reply);
+
+                LOG_INFO << "用户 " << current_user << " 访问了 index 页面";
+                if (res.setFile("/home/bazinga/ServerPractice/Html/index.html")) {
+                    res.addHeader("Content-Type", "text/html; charset=utf-8");
+                } else {
+                    res.setStatusCode(404, "Not Found");
+                    res.addHeader("Content-Type", "text/html; charset=utf-8");
+                    res.setBody("<h1 style='color:red;'>404 找不到页面</h1>");
+                }
+            } else {
+                if (reply) {
+                    LOG_ERROR << "Redis token验证失败: " << reply->str;
+                    freeReplyObject(reply);
+                } 
+                res.setStatusCode(401, "Unauthorized");
+                res.addHeader("Content-Type", "text/html; charset=utf-8");
+                res.setBody("<h1>登录已过期或无效，请登录 <a href='/login'>登录</a></h1>");
+            }
+        } else if (req.getPath() == "/logout") {
+            std::string token = req.getCookie("token");
+            if (!token.empty()) {
+                redisContext* redis;
+                RedisConnRAII guard(&redis, &RedisConnPool::Instance());
+                redisReply* reply = (redisReply*)redisCommand(redis, "DEL %s", token.c_str());
+                if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER) {
+                    LOG_INFO << "用户退出登录，token 已删除";
+                }
+                freeReplyObject(reply);
+            }
+            
+            // 告诉浏览器把这个cookie删掉，生命周期设置为0
+            res.addHeader("Set-Cookie", "token=; Max-Age=0; HttpOnly; Path=/; SameSite=Lax");
+
+            // 302 重定向到登录页面
+            res.setStatusCode(302, "Found");
+            res.addHeader("Location", "/login");
         } else {
             res.setStatusCode(404, "Not Found");
             res.addHeader("Content-Type", "text/html; charset=utf-8");
